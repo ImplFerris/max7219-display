@@ -1,0 +1,29 @@
+[package]
+name = "max7219-display"
+version = "0.1.0"
+edition = "2024"
+authors = ["ImplFerris"]
+description = "A no_std driver for the MAX7219 LED display controller"
+license = "MIT"
+repository = "https://github.com/implferris/max7219-display"
+readme = "README.md"
+categories = ["embedded", "hardware-support", "no-std"]
+keywords = [
+    "max7219",
+    "led",
+    "display",
+    "led-matrix",
+    "7-segment",
+    "7seg",
+    "embedded-hal",
+    "no-std",
+]
+
+[dependencies]
+embedded-graphics = "0.8.1"
+embedded-hal = "1.0.0"
+
+[features]
+default = ["seven-segment", "led-matrix"]
+seven-segment = []
+led-matrix = []
