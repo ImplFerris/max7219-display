@@ -1,7 +1,7 @@
 //! 7-segment display implementation
 
 pub mod display;
-pub mod font;
+pub mod fonts;
 
 pub use display::SevenSegment;
-pub use font::{Font, STANDARD_FONT};
+pub use fonts::{Font, STANDARD_FONT};

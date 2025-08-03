@@ -24,6 +24,6 @@ embedded-graphics = "0.8.1"
 embedded-hal = "1.0.0"
 
 [features]
-default = ["seven-segment", "led-matrix"]
+default = []
 seven-segment = []
 led-matrix = []
