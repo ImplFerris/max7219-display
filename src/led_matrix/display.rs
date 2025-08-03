@@ -1,13 +1,13 @@
 //! LED matrix display implementation
 
-use embedded_hal::spi::SpiDevice;
+use embedded_hal::{delay::DelayNs, spi::SpiDevice};
 
 use crate::{
-    Max7219,
-    error::Error,
+    Error, Max7219,
     led_matrix::{
         buffer::MatrixBuffer,
         fonts::{self, LedFont, STANDARD_LED_FONT},
+        scroll::{ScrollConfig, ScrollingText},
     },
     registers::Digit,
 };
@@ -155,5 +155,64 @@ where
                 .write_raw_digit(device_index, digit_register, *value)?;
         }
         Ok(())
+    }
+
+    /// Scroll the given text across the LED matrix.
+    ///
+    /// This will render `text` using the current font and step through
+    /// each frame at the delay specified by `config.step_delay_ns`. If
+    /// `config.loop_text` is true, the text will repeat with
+    /// `config.loop_padding` pixels of blank space between repetitions.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `delay`: delay provider implementing `embedded_hal::delay::DelayNs`.
+    /// - `text`: the string slice to scroll.
+    /// - `config`: scrolling configuration (speed, step size, looping).
+    ///
+    /// # Errors
+    ///
+    /// Returns a `MatrixError` if updating the display buffer fails.
+    pub fn scroll_text<D: DelayNs>(
+        &mut self,
+        delay: &mut D,
+        text: &str,
+        config: ScrollConfig,
+    ) -> Result<(), Error<SPI::Error>> {
+        let mut scroller = ScrollingText::new(text, self.default_font, config);
+        scroller.reset();
+
+        let device_count = self.driver().device_count();
+
+        loop {
+            // Update each display device
+            for device_index in 0..device_count {
+                let frame = scroller.get_frame()?; // Each device shows 8 pixels width
+                self.write_buffer(device_index, &frame)?;
+
+                // Advance offset for next device to create continuous scrolling
+                scroller.current_offset += 8;
+            }
+
+            // Reset offset and step for next frame
+            scroller.current_offset -= (device_count * 8) as i32;
+            if !scroller.step() {
+                break; // Stop if not looping and text has finished scrolling
+            }
+
+            delay.delay_ns(config.step_delay_ns);
+        }
+
+        Ok(())
+    }
+
+    /// Scroll Text with default config
+    pub fn scroll_text_default<D: DelayNs>(
+        &mut self,
+        delay: &mut D,
+        text: &str,
+    ) -> Result<(), Error<SPI::Error>> {
+        self.scroll_text(delay, text, ScrollConfig::default())
     }
 }
