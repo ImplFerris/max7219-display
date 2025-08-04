@@ -48,100 +48,38 @@ impl Register {
     pub const fn addr(self) -> u8 {
         self as u8
     }
-}
 
-// impl TryFrom<u8> for Register {
-//     type Error = ();
-
-//     fn try_from(value: u8) -> Result<Self, Self::Error> {
-//         match value {
-//             0x00 => Ok(Register::NoOp),
-//             0x01 => Ok(Register::Digit0),
-//             0x02 => Ok(Register::Digit1),
-//             0x03 => Ok(Register::Digit2),
-//             0x04 => Ok(Register::Digit3),
-//             0x05 => Ok(Register::Digit4),
-//             0x06 => Ok(Register::Digit5),
-//             0x07 => Ok(Register::Digit6),
-//             0x08 => Ok(Register::Digit7),
-//             0x09 => Ok(Register::DecodeMode),
-//             0x0A => Ok(Register::Intensity),
-//             0x0B => Ok(Register::ScanLimit),
-//             0x0C => Ok(Register::Shutdown),
-//             0x0F => Ok(Register::DisplayTest),
-//             _ => Err(()),
-//         }
-//     }
-// }
-
-impl From<Digit> for Register {
-    fn from(value: Digit) -> Self {
-        match value {
-            Digit::D0 => Register::Digit0,
-            Digit::D1 => Register::Digit1,
-            Digit::D2 => Register::Digit2,
-            Digit::D3 => Register::Digit3,
-            Digit::D4 => Register::Digit4,
-            Digit::D5 => Register::Digit5,
-            Digit::D6 => Register::Digit6,
-            Digit::D7 => Register::Digit7,
-        }
-    }
-}
-
-/// Represents a digit position (0 to 7) on the MAX7219 display.
-#[repr(u8)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Digit {
-    /// Digit 0
-    D0 = 0,
-    /// Digit 1
-    D1 = 1,
-    /// Digit 2
-    D2 = 2,
-    /// Digit 3
-    D3 = 3,
-    /// Digit 4
-    D4 = 4,
-    /// Digit 5
-    D5 = 5,
-    /// Digit 6
-    D6 = 6,
-    /// Digit 7
-    D7 = 7,
-}
-
-impl Digit {
-    /// Returns an iterator over all digit positions (D0 to D7).
-    pub fn iter() -> impl Iterator<Item = Digit> {
-        [
-            Digit::D0,
-            Digit::D1,
-            Digit::D2,
-            Digit::D3,
-            Digit::D4,
-            Digit::D5,
-            Digit::D6,
-            Digit::D7,
-        ]
-        .into_iter()
-    }
-}
-
-impl TryFrom<u8> for Digit {
-    type Error = DigitError;
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        match value {
-            0 => Ok(Digit::D0),
-            1 => Ok(Digit::D1),
-            2 => Ok(Digit::D2),
-            3 => Ok(Digit::D3),
-            4 => Ok(Digit::D4),
-            5 => Ok(Digit::D5),
-            6 => Ok(Digit::D6),
-            7 => Ok(Digit::D7),
+    /// Try to convert a digit index (0-7) into a corresponding `Register::DigitN`.
+    pub(crate) fn try_digit(digit: u8) -> Result<Self, DigitError> {
+        match digit {
+            0 => Ok(Register::Digit0),
+            1 => Ok(Register::Digit1),
+            2 => Ok(Register::Digit2),
+            3 => Ok(Register::Digit3),
+            4 => Ok(Register::Digit4),
+            5 => Ok(Register::Digit5),
+            6 => Ok(Register::Digit6),
+            7 => Ok(Register::Digit7),
             _ => Err(DigitError::InvalidDigit),
         }
+    }
+
+    /// Returns an iterator over all digit registers (Digit0 to Digit7).
+    ///
+    /// Useful for iterating through display rows or columns when writing
+    /// to all digits of a MAX7219 device in order.
+    pub fn digits() -> impl Iterator<Item = Register> {
+        [
+            Register::Digit0,
+            Register::Digit1,
+            Register::Digit2,
+            Register::Digit3,
+            Register::Digit4,
+            Register::Digit5,
+            Register::Digit6,
+            Register::Digit7,
+        ]
+        .into_iter()
     }
 }
 

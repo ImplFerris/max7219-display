@@ -5,7 +5,7 @@ use embedded_hal::spi::SpiDevice;
 use crate::{
     MAX_DISPLAYS, NUM_DIGITS,
     error::Error,
-    registers::{DecodeMode, Digit, Register},
+    registers::{DecodeMode, Register},
 };
 
 /// Driver for the MAX7219 LED display controller.
@@ -67,15 +67,13 @@ where
     pub fn init(&mut self) -> Result<(), Error<SPI::Error>> {
         self.power_on()?;
 
-        for i in 0..self.device_count {
-            self.test_display(i, false)?;
-            self.set_scan_limit(i, NUM_DIGITS)?;
-            self.set_decode_mode(i, DecodeMode::NoDecode)?;
-            self.clear_display(i)?;
-        }
+        self.test_all(false)?;
+        self.set_scan_limit_all(NUM_DIGITS)?;
+        self.set_decode_mode_all(DecodeMode::NoDecode)?;
 
-        self.power_off()?;
-        self.power_on()?;
+        self.clear_all()?;
+        // self.power_off()?;
+        // self.power_on()?;
 
         Ok(())
     }
@@ -124,24 +122,62 @@ where
         Ok(())
     }
 
+    /// Write each (register, data) tuple to its corresponding MAX7219 device in the daisy chain.
+    ///
+    /// The number of tuples in `ops` must exactly match `self.device_count`. Each entry
+    /// in `ops` is sent to the device at the same index: `ops[0]` to device 0, `ops[1]` to device 1, etc.
+    ///
+    /// The SPI buffer is filled in reverse order so that the first bytes clocked out
+    /// travel through the chain and reach the last device first.
+    ///
+    /// # Panics (only in debug builds)
+    /// - If `ops.len() != self.device_count`.
+    ///
+    /// # Errors
+    /// - Returns an SPI error if the write operation fails.
+    pub(crate) fn write_all_registers(
+        &mut self,
+        ops: &[(Register, u8)],
+    ) -> Result<(), Error<SPI::Error>> {
+        debug_assert!(
+            ops.len() == self.device_count,
+            "ops.len() = {}, expected {}",
+            ops.len(),
+            self.device_count
+        );
+        // clear the buffer: 2 bytes per device
+        self.buffer = [0; MAX_DISPLAYS * 2];
+
+        // fill in reverse order so that SPI shifts into the last device first
+        for (i, &(reg, data)) in ops.iter().rev().enumerate() {
+            let offset = i * 2;
+            self.buffer[offset] = reg as u8;
+            self.buffer[offset + 1] = data;
+        }
+
+        // send exactly device_count packets
+        let len = self.device_count * 2;
+        self.spi.write(&self.buffer[..len])?;
+
+        Ok(())
+    }
+
     // fn write_raw_register(&mut self, register: u8, data: u8) -> Result<(), SPI::Error> {
     //     self.spi.write(&[register, data])
     // }
 
     /// Powers on all displays by writing `0x01` to the Shutdown register.
     pub fn power_on(&mut self) -> Result<(), Error<SPI::Error>> {
-        for device_index in 0..self.device_count {
-            self.power_on_display(device_index)?;
-        }
-        Ok(())
+        let ops = [(Register::Shutdown, 0x01); MAX_DISPLAYS];
+
+        self.write_all_registers(&ops[..self.device_count])
     }
 
     /// Powers off all displays by writing `0x00` to the Shutdown register.
     pub fn power_off(&mut self) -> Result<(), Error<SPI::Error>> {
-        for device_index in 0..self.device_count {
-            self.power_off_display(device_index)?;
-        }
-        Ok(())
+        let ops = [(Register::Shutdown, 0x00); MAX_DISPLAYS];
+
+        self.write_all_registers(&ops[..self.device_count])
     }
 
     /// Powers on a single display by writing `0x01` to the Shutdown register.
@@ -162,16 +198,23 @@ where
         self.write_device_register(device_index, Register::Shutdown, 0x00)
     }
 
-    /// Enables or disables display test mode on a specific display.
+    /// Enables or disables display test mode on a specific device.
     ///
-    /// When enabled, all LEDs on that display are lit regardless of current display data.
-    pub fn test_display(
+    /// When enabled, all LEDs on that device are lit regardless of current device data.
+    pub fn test_device(
         &mut self,
         device_index: usize,
         enable: bool,
     ) -> Result<(), Error<SPI::Error>> {
         let data = if enable { 0x01 } else { 0x00 };
         self.write_device_register(device_index, Register::DisplayTest, data)
+    }
+
+    /// Enable or disable display test mode on all devices in one SPI transaction.
+    pub fn test_all(&mut self, enable: bool) -> Result<(), Error<SPI::Error>> {
+        let data = if enable { 0x01 } else { 0x00 };
+        let ops: [(Register, u8); MAX_DISPLAYS] = [(Register::DisplayTest, data); MAX_DISPLAYS];
+        self.write_all_registers(&ops[..self.device_count])
     }
 
     /// Sets how many digits the MAX7219 should actively scan and display.
@@ -187,7 +230,7 @@ where
     ///
     /// # Errors
     /// Returns `Error::InvalidScanLimit` if the value is not in the range 1 to 8.
-    pub fn set_scan_limit(
+    pub fn set_device_scan_limit(
         &mut self,
         device_index: usize,
         limit: u8,
@@ -199,6 +242,18 @@ where
         self.write_device_register(device_index, Register::ScanLimit, limit - 1)
     }
 
+    /// Set scan‐limit on all devices in one go.
+    ///
+    /// `limit` must be in 1..=8. Internally sends `limit - 1` to each chip.
+    pub fn set_scan_limit_all(&mut self, limit: u8) -> Result<(), Error<SPI::Error>> {
+        if !(1..=8).contains(&limit) {
+            return Err(Error::InvalidScanLimit);
+        }
+        let val = limit - 1;
+        let ops: [(Register, u8); MAX_DISPLAYS] = [(Register::ScanLimit, val); MAX_DISPLAYS];
+        self.write_all_registers(&ops[..self.device_count])
+    }
+
     /// Sets which digits use Code B decoding mode.
     ///
     /// This determines whether the MAX7219 automatically decodes numeric values
@@ -208,12 +263,19 @@ where
     /// depending on how many digits you want to enable for automatic decoding.
     ///
     /// This applies to a specific device in the daisy chain, selected by `device_index`.
-    pub fn set_decode_mode(
+    pub fn set_device_decode_mode(
         &mut self,
         device_index: usize,
         mode: DecodeMode,
     ) -> Result<(), Error<SPI::Error>> {
         self.write_device_register(device_index, Register::DecodeMode, mode as u8)
+    }
+
+    /// Set decode‐mode on all devices in one go.
+    pub fn set_decode_mode_all(&mut self, mode: DecodeMode) -> Result<(), Error<SPI::Error>> {
+        let byte = mode as u8;
+        let ops: [(Register, u8); MAX_DISPLAYS] = [(Register::DecodeMode, byte); MAX_DISPLAYS];
+        self.write_all_registers(&ops[..self.device_count])
     }
 
     /// Clears all digits by writing 0 to each digit register (DIG0 to DIG7).
@@ -223,18 +285,19 @@ where
     ///
     /// This applies to a specific device in the daisy chain, selected by `device_index`.
     pub fn clear_display(&mut self, device_index: usize) -> Result<(), Error<SPI::Error>> {
-        for digit in Digit::iter() {
-            let register = Register::from(digit);
-            self.write_device_register(device_index, register, 0x00)?;
+        for digit_register in Register::digits() {
+            self.write_device_register(device_index, digit_register, 0x00)?;
         }
         Ok(())
     }
 
     /// Clears all digits on all connected MAX7219 displays.
     pub fn clear_all(&mut self) -> Result<(), Error<SPI::Error>> {
-        for device_index in 0..self.device_count {
-            self.clear_display(device_index)?;
+        for digit_register in Register::digits() {
+            let ops = [(digit_register, 0x00); MAX_DISPLAYS];
+            self.write_all_registers(&ops[..self.device_count])?;
         }
+
         Ok(())
     }
 
@@ -309,11 +372,11 @@ where
     pub fn write_raw_digit(
         &mut self,
         device_index: usize,
-        digit: Digit,
+        digit: u8,
         value: u8,
     ) -> Result<(), Error<SPI::Error>> {
-        let register = Register::from(digit);
-        self.write_device_register(device_index, register, value)
+        let digit_register = Register::try_digit(digit)?;
+        self.write_device_register(device_index, digit_register, value)
     }
 
     /// Sets the brightness intensity (0 to 15) for a specific device.

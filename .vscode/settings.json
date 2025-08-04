@@ -1,6 +1,7 @@
 {
     "rust-analyzer.cargo.features": [
         "led-matrix",
-        "seven-segment"
+        "seven-segment",
+        "graphics"
     ]
 }
