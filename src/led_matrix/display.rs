@@ -128,7 +128,7 @@ where
     /// # Errors
     /// Returns an error if the digit conversion fails or if SPI communication fails.
     pub fn draw_char(&mut self, device_index: usize, ch: char) -> Result<(), Error<SPI::Error>> {
-        self.draw_char_with_font(device_index, self.default_font, ch)
+        self.draw_char_with_font(device_index, ch, self.default_font)
     }
 
     /// Draws a single 8x8 character on the specified display device using a provided font.
@@ -139,13 +139,14 @@ where
     ///
     /// # Arguments
     /// * `device_index` - Index of the MAX7219 device to write to.
-    /// * `font` - The font to use for character lookup and rendering.
     /// * `ch` - The character to render on the display.
+    /// * `font` - The font to use for character lookup and rendering.
+    ///
     pub fn draw_char_with_font(
         &mut self,
         device_index: usize,
-        font: &LedFont,
         ch: char,
+        font: &LedFont,
     ) -> Result<(), Error<SPI::Error>> {
         let bitmap = font.get_char(ch);
         // self.driver.draw_bitmap(bitmap, pos);
@@ -154,6 +155,29 @@ where
             self.driver
                 .write_raw_digit(device_index, digit_register, *value)?;
         }
+        Ok(())
+    }
+
+    /// Draw a string of text on the LED matrix using the default font.
+    /// Each character is displayed on one device in the daisy chain.
+    /// If the string is longer than the number of devices, the extra characters are ignored.
+    pub fn draw_text(&mut self, text: &str) -> Result<(), Error<SPI::Error>> {
+        self.draw_text_with_font(text, self.default_font)
+    }
+
+    /// Draw a string of text on the LED matrix using a specified font.
+    /// Each character is displayed on one device in the daisy chain.
+    /// If the string is longer than the number of devices, the extra characters are ignored.
+    pub fn draw_text_with_font(
+        &mut self,
+        text: &str,
+        font: &LedFont,
+    ) -> Result<(), Error<SPI::Error>> {
+        text.chars()
+            .take(self.driver.device_count())
+            .enumerate()
+            .try_for_each(|(device_index, ch)| self.draw_char_with_font(device_index, ch, font))?;
+
         Ok(())
     }
 
@@ -207,7 +231,7 @@ where
         Ok(())
     }
 
-    /// Scroll Text with default config
+    /// Scroll the given text across the LED matrix using the default scroll configuration.
     pub fn scroll_text_default<D: DelayNs>(
         &mut self,
         delay: &mut D,
