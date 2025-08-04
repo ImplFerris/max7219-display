@@ -77,8 +77,7 @@ impl<'a> ScrollingText<'a> {
         for row in 0..8 {
             let mut row_data = 0u8;
             for col in 0..8 {
-                let source_col = (self.current_offset as isize + col as isize) as usize;
-                if self.pixel_on(source_col, row) {
+                if self.pixel_on(col, row) {
                     row_data |= 1 << (7 - col);
                 }
             }
@@ -87,29 +86,39 @@ impl<'a> ScrollingText<'a> {
 
         Ok(buffer)
     }
-
     /// Return true if the pixel at (source_col, row) should be on
     fn pixel_on(&self, source_col: usize, row: usize) -> bool {
+        // Calculate the actual column position considering the offset
+        let actual_col = self.current_offset as isize + source_col as isize;
+
+        // If the actual column is negative, no pixel should be on
+        if actual_col < 0 {
+            return false;
+        }
+
+        let col = actual_col as usize;
+
         // If outside text width and not looping, no pixel
-        if source_col >= self.text_width && !self.config.loop_text {
+        if col >= self.text_width && !self.config.loop_text {
             return false;
         }
 
         // Wrap around if looping
-        let col = if source_col < self.text_width {
-            source_col
+        let final_col = if self.config.loop_text && col >= self.text_width {
+            col % self.text_width
         } else {
-            source_col % self.text_width
+            col
         };
 
         // Only actual text columns (exclude padding)
         let text_pixels = self.text.chars().count() * 8;
-        if col >= text_pixels {
+        if final_col >= text_pixels {
             return false;
         }
 
-        let char_index = col / 8;
-        let bit_index = col % 8;
+        let char_index = final_col / 8;
+        let bit_index = final_col % 8;
+
         // Safe since char_index < char count
         let ch = self.text.chars().nth(char_index).unwrap_or('?');
         let bitmap = self.font.get_char(ch);

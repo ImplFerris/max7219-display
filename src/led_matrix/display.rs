@@ -100,6 +100,11 @@ where
         self.driver.clear_display(device_index)
     }
 
+    /// Clear all device
+    pub fn clear_all(&mut self) -> Result<(), Error<SPI::Error>> {
+        self.driver.clear_all()
+    }
+
     /// Write a complete buffer to a specific display
     pub fn write_buffer(
         &mut self,
@@ -210,17 +215,25 @@ where
         let device_count = self.driver().device_count();
 
         loop {
+            // Store the original offset
+            let base_offset = scroller.current_offset;
+
             // Update each display device
             for device_index in 0..device_count {
+                // Set offset for this specific device
+                // Each device shows 8 pixels, so device N shows pixels at offset + (N * 8)
+                scroller.current_offset = base_offset + (device_index as i32 * 8);
+
                 let frame = scroller.get_frame()?; // Each device shows 8 pixels width
                 self.write_buffer(device_index, &frame)?;
 
                 // Advance offset for next device to create continuous scrolling
-                scroller.current_offset += 8;
+                // scroller.current_offset += 8;
             }
 
-            // Reset offset and step for next frame
-            scroller.current_offset -= (device_count * 8) as i32;
+            // Restore the original offset and step to next position
+            scroller.current_offset = base_offset;
+
             if !scroller.step() {
                 break; // Stop if not looping and text has finished scrolling
             }
