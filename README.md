@@ -28,7 +28,7 @@ max7219-display = {version="0.1", features=["led-matrix", "seven-segment", "grap
 
 ## Examples
 
-Comprehensive example projects are available in the separate [max7219-examples](https://github.com/implferris/max7219-examples) repository.
+Example projects are available in the separate [max7219-examples](https://github.com/implferris/max7219-examples) repository to help you get started.
 
 ## License
 

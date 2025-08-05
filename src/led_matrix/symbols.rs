@@ -1,13 +1,13 @@
-//! Predefined 8x8 icons for LED matrix
+//! Predefined 8x8 symbols for LED matrix
 
 use crate::led_matrix::buffer::MatrixBuffer;
 
-/// Enum representing predefined 8x8 icon patterns.
+/// Enum representing predefined 8x8 symbols.
 ///
-/// These icons can be displayed on an LED matrix.
-/// To convert an `Icon` into a displayable buffer, use `.to_buffer()`.
+/// These symbols can be displayed on an LED matrix.
+/// To convert an `Symbol` into a displayable buffer, use `.to_buffer()`.
 #[derive(Debug, Clone, Copy)]
-pub enum Icon {
+pub enum Symbol {
     /// Heart shape
     Heart,
     /// Smiley face
@@ -32,14 +32,14 @@ pub enum Icon {
     Circle,
 }
 
-impl Icon {
-    /// Convert the selected icon into a `MatrixBuffer` pattern.
+impl Symbol {
+    /// Convert the selected symbol into a `MatrixBuffer` pattern.
     ///
-    /// This returns an 8x8 matrix buffer representing the selected icon.
+    /// This returns an 8x8 matrix buffer representing the selected symbol.
     #[rustfmt::skip]
     pub const fn to_buffer(&self) -> MatrixBuffer {
         match self {
-            Icon::Heart => MatrixBuffer::from_data([
+            Symbol::Heart => MatrixBuffer::from_data([
                 0b00000000,
                 0b01100110,
                 0b11111111,
@@ -49,7 +49,7 @@ impl Icon {
                 0b00111100,
                 0b00011000,
             ]),
-            Icon::Smiley => MatrixBuffer::from_data([
+            Symbol::Smiley => MatrixBuffer::from_data([
                 0b00111100,
                 0b01000010,
                 0b10100101,
@@ -59,7 +59,7 @@ impl Icon {
                 0b01000010,
                 0b00111100,
             ]),
-             Icon::SadFace => MatrixBuffer::from_data([
+             Symbol::SadFace => MatrixBuffer::from_data([
                 0b00111100, 
                 0b01000010, 
                 0b10100101, 
@@ -69,7 +69,7 @@ impl Icon {
                 0b01000010, 
                 0b00111100, 
             ]),
-            Icon::ArrowUp => MatrixBuffer::from_data([
+            Symbol::ArrowUp => MatrixBuffer::from_data([
                 0b00000000, 
                 0b00010000,
                 0b00111000,
@@ -79,7 +79,7 @@ impl Icon {
                 0b00010000,
                 0b00010000,
             ]),
-            Icon::ArrowDown => MatrixBuffer::from_data([
+            Symbol::ArrowDown => MatrixBuffer::from_data([
                 0b00010000, 
                 0b00010000,
                 0b00010000,
@@ -89,7 +89,7 @@ impl Icon {
                 0b00010000,
                 0b00000000
             ]),
-            Icon::ArrowLeft => MatrixBuffer::from_data([
+            Symbol::ArrowLeft => MatrixBuffer::from_data([
                 0b00001000,
                 0b00011000,
                 0b00111000,
@@ -99,7 +99,7 @@ impl Icon {
                 0b00001000,
                 0b00000000,
             ]),
-            Icon::ArrowRight => MatrixBuffer::from_data([
+            Symbol::ArrowRight => MatrixBuffer::from_data([
                 0b00001000,
                 0b00001100,
                 0b00001110,
@@ -109,7 +109,7 @@ impl Icon {
                 0b00001000,
                 0b00000000,
             ]),
-            Icon::Checkmark => MatrixBuffer::from_data([
+            Symbol::Checkmark => MatrixBuffer::from_data([
                 0b00000001,
                 0b00000010,
                 0b00000100,
@@ -119,7 +119,7 @@ impl Icon {
                 0b00000000,
                 0b00000000,
             ]),
-            Icon::XMark => MatrixBuffer::from_data([
+            Symbol::XMark => MatrixBuffer::from_data([
                 0b10000001,
                 0b01000010,
                 0b00100100,
@@ -129,7 +129,7 @@ impl Icon {
                 0b01000010,
                 0b10000001,
             ]),
-            Icon::MusicNote => MatrixBuffer::from_data([
+            Symbol::MusicNote => MatrixBuffer::from_data([
                 0b00011100,
                 0b00010100,
                 0b00011100,
@@ -139,7 +139,7 @@ impl Icon {
                 0b01110000,
                 0b00100000,
             ]),
-            Icon::Circle => MatrixBuffer::from_data([
+            Symbol::Circle => MatrixBuffer::from_data([
                 0b00111100,
                 0b01111110,
                 0b11111111,

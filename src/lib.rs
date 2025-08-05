@@ -3,11 +3,6 @@
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
 #![cfg_attr(not(doctest), doc = include_str!("../README.md"))]
-//! MAX7219 Driver for 7-segment displays and LED matrices
-//!
-//! This crate provides a generic driver for the MAX7219 LED display driver
-//! that supports both 7-segment displays and 8x8 LED matrices. Multiple
-//! devices can be daisy-chained together.
 
 pub mod driver;
 pub mod error;
