@@ -249,9 +249,6 @@ where
 
                 let frame = scroller.get_frame()?; // Each device shows 8 pixels width
                 self.write_buffer(device_index, &frame)?;
-
-                // Advance offset for next device to create continuous scrolling
-                // scroller.current_offset += 8;
             }
 
             // Restore the original offset and step to next position

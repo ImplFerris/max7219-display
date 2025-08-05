@@ -12,6 +12,8 @@ pub enum Icon {
     Heart,
     /// Smiley face
     Smiley,
+    /// Sad face
+    SadFace,
     /// Upward pointing arrow
     ArrowUp,
     /// Downward pointing arrow
@@ -56,6 +58,16 @@ impl Icon {
                 0b10011001,
                 0b01000010,
                 0b00111100,
+            ]),
+             Icon::SadFace => MatrixBuffer::from_data([
+                0b00111100, 
+                0b01000010, 
+                0b10100101, 
+                0b10000001, 
+                0b10011001, 
+                0b10100101, 
+                0b01000010, 
+                0b00111100, 
             ]),
             Icon::ArrowUp => MatrixBuffer::from_data([
                 0b00000000, 

@@ -8,16 +8,7 @@ license = "MIT"
 repository = "https://github.com/implferris/max7219-display"
 readme = "README.md"
 categories = ["embedded", "hardware-support", "no-std"]
-keywords = [
-    "max7219",
-    "led",
-    "display",
-    "led-matrix",
-    "7-segment",
-    "7seg",
-    "embedded-hal",
-    "no-std",
-]
+keywords = ["max7219", "led", "display", "7-segment", "driver"]
 
 [dependencies]
 embedded-hal = "1.0.0"
