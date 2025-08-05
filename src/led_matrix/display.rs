@@ -137,7 +137,7 @@ where
 
     /// Draws a single 8x8 character on the specified display device using a provided font.
     ///
-    /// This function is similar to [`draw_char`], but allows overriding the font used for rendering.
+    /// This function is similar to [`Self::draw_char`], but allows overriding the font used for rendering.
     /// The character is mapped to an 8-byte bitmap. Each byte represents a row on the matrix, with
     /// the most significant bit (bit 7) on the left and the least significant bit (bit 0) on the right.
     ///
@@ -287,8 +287,8 @@ where
     /// Device 1, row 0 pixels: [1, 1, 1, 1, 0, 0, 0, 0]  => 0b11110000 => 0xF0
     ///
     /// Since SPI sends left to right, we must reverse the device order in the ops array:
-    ///     ops[0] = (Digit0, 0xF0)  // Device 1
-    ///     ops[1] = (Digit0, 0xAA)  // Device 0
+    ///     ops\[0\] = (Digit0, 0xF0)  // Device 1
+    ///     ops\[1\] = (Digit0, 0xAA)  // Device 0
     ///
     /// These are sent out in one SPI write for Digit0, and similarly repeated for Digit1 through Digit7.
     pub fn flush(&mut self) -> Result<(), Error<SPI::Error>> {

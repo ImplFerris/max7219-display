@@ -2,14 +2,14 @@
 
 use crate::error::DigitError;
 
-/// MAX7219 register addresses.
+/// MAX7219 control register addresses.
 ///
-/// Each variant in this enum represents one of the control registers
-/// inside the MAX7219 display driver chip. These registers are used
-/// to configure various display settings and control individual digits.
+/// Each variant corresponds to a register in the MAX7219 display driver chip.
+/// These registers are used to control display behavior, including digit data,
+/// decoding mode, brightness, scan limit, power state, and test mode.
 ///
-/// This enum is typically used when writing 16-bit data packets to the MAX7219.
-/// The address byte (bits D8–D11) selects which register to write to.
+/// This enum is typically used when sending 16-bit data packets to the MAX7219,
+/// where the upper byte specifies the target register.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum Register {
@@ -83,14 +83,14 @@ impl Register {
     }
 }
 
-/// Represents the decode mode for the MAX7219 display driver.
+/// Decode mode configuration for the MAX7219 display driver.
 ///
-/// The decode mode determines which digits use "Code B" decoding.
-/// In Code B mode, the driver automatically maps numeric values (0–9, E, H, L, etc.)
-/// to their corresponding 7-segment patterns. Digits not using Code B must be
-/// manually controlled by setting individual segments.
+/// Code B decoding allows the driver to automatically convert certain values
+/// (such as 0-9, E, H, L, and others) into their corresponding 7-segment patterns.
+/// Digits not using Code B must be controlled manually using raw segment data.
 ///
-/// You can choose to enable Code B for specific digits or disable it entirely.
+/// Use this to configure which digits should use Code B decoding and which
+/// should remain in raw segment mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum DecodeMode {

@@ -254,15 +254,15 @@ where
         self.write_all_registers(&ops[..self.device_count])
     }
 
-    /// Sets which digits use Code B decoding mode.
+    /// Code B decoding allows the MAX7219 to automatically convert values like `0-9`, `E`, `H`, `L`, etc.
+    /// into the corresponding 7-segment patterns, instead of requiring manual segment control.
     ///
-    /// This determines whether the MAX7219 automatically decodes numeric values
-    /// (like 0–9, E, H, L, etc.) for specific digits, or expects manual segment control.
+    /// The `mode` parameter specifies which digits use automatic decoding.
+    /// Use [`DecodeMode`] variants
+    /// such as [`NoDecode`], [`Digit0`], [`Digits0To3`], or [`AllDigits`] based on which digits
+    /// should be decoded automatically.
     ///
-    /// Use [`DecodeMode`] variants like `NoDecode`, `Digit0`, `Digits0To3`, or `AllDigits`
-    /// depending on how many digits you want to enable for automatic decoding.
-    ///
-    /// This applies to a specific device in the daisy chain, selected by `device_index`.
+    /// The `device_index` selects the target device. For a single device setup, use `0`.
     pub fn set_device_decode_mode(
         &mut self,
         device_index: usize,

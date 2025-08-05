@@ -3,13 +3,17 @@
 A platform-agnostic, `no_std` driver for the MAX7219 LED display controller using [`embedded-hal`](https://docs.rs/embedded-hal/latest/embedded_hal/) traits.  Supports both 8x8 LED matrix displays and 7-segment numeric displays.
 
 
-## Features
+## Crate Features
 
-- Supports multiple daisy-chained MAX7219 devices  
-- Compatible with both LED matrix and 7-segment display configurations  
-- Supports scrolling text, printing characters, and displaying patterns on LED matrices  
-- Easy to extend with custom fonts and display layouts  
-- Optional `embedded-graphics` integration via feature flag  
+This driver supports multiple daisy-chained MAX7219 devices and works with both 7-segment and LED matrix configurations. 
+
+It includes built-in support for scrolling text, displaying characters, and rendering custom patterns on matrix displays. Support for custom fonts. 
+
+Additional features can be enabled by adding the following to your `Cargo.toml`:
+
+- `led-matrix` - provides utility functions for working with 8x8 LED matrix displays, including text rendering, scrolling, and pattern display.
+- `graphics` - integrates with the [`embedded-graphics-core`](https://docs.rs/embedded-graphics-core) crate to enable drawing text, shapes, and images on LED matrix displays.
+- `seven-segment` - adds helper functions for 7-segment numeric displays, such as printing digits and supported characters.
 
 
 ## Usage

@@ -1,6 +1,6 @@
 [package]
 name = "max7219-display"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 authors = ["ImplFerris"]
 description = "A no_std driver for the MAX7219 LED display controller"
@@ -19,3 +19,7 @@ default = []
 seven-segment = []
 led-matrix = []
 graphics = ["dep:embedded-graphics-core"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
