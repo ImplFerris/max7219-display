@@ -18,6 +18,14 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-max7219-display = "0.1"
+max7219-display = {version="0.1", features=["led-matrix", "seven-segment", "graphics"]}
 # max7219-display = { git = "https://github.com/implferris/max7219-display" }
 ```
+
+## Examples
+
+Comprehensive example projects are available in the separate [max7219-examples](https://github.com/implferris/max7219-examples) repository.
+
+## License
+
+This project is licensed under the MIT License.
