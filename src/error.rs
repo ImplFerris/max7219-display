@@ -114,7 +114,7 @@ mod tests {
     #[test]
     fn test_from_spi_error() {
         let spi_error = MockSpiError;
-        let error: Error = spi_error.into();
+        let error = Error::from(spi_error);
         assert_eq!(error, Error::SpiError);
     }
 

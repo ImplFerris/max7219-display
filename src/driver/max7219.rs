@@ -136,12 +136,6 @@ where
     /// # Errors
     /// - Returns an SPI error if the write operation fails.
     pub(crate) fn write_all_registers(&mut self, ops: &[(Register, u8)]) -> Result<()> {
-        debug_assert!(
-            ops.len() == self.device_count,
-            "ops.len() = {}, expected {}",
-            ops.len(),
-            self.device_count
-        );
         // clear the buffer: 2 bytes per device
         self.buffer = [0; MAX_DISPLAYS * 2];
 
@@ -177,21 +171,21 @@ where
         self.write_all_registers(&ops[..self.device_count])
     }
 
-    /// Powers on a single display by writing `0x01` to the Shutdown register.
+    /// Powers on a single device by writing `0x01` to the Shutdown register.
     ///
     /// # Arguments
     ///
     /// * `device_index` - The index of the display to power on.
-    pub fn power_on_display(&mut self, device_index: usize) -> Result<()> {
+    pub fn power_on_device(&mut self, device_index: usize) -> Result<()> {
         self.write_device_register(device_index, Register::Shutdown, 0x01)
     }
 
-    /// Powers off a single display by writing `0x00` to the Shutdown register.
+    /// Powers off a single device by writing `0x00` to the Shutdown register.
     ///
     /// # Arguments
     ///
-    /// * `device_index` - The index of the display to power off.
-    pub fn power_off_display(&mut self, device_index: usize) -> Result<()> {
+    /// * `device_index` - The index of the device to power off.
+    pub fn power_off_device(&mut self, device_index: usize) -> Result<()> {
         self.write_device_register(device_index, Register::Shutdown, 0x00)
     }
 
@@ -374,9 +368,549 @@ where
 
     /// Set intensity for all displays
     pub fn set_intensity_all(&mut self, intensity: u8) -> Result<()> {
-        for device_index in 0..self.device_count {
-            self.set_intensity(device_index, intensity)?;
+        let ops = [(Register::Intensity, intensity); MAX_DISPLAYS];
+        self.write_all_registers(&ops[..self.device_count])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{MAX_DISPLAYS, NUM_DIGITS, registers::DecodeMode, registers::Register};
+    use embedded_hal_mock::eh1::{spi::Mock as SpiMock, spi::Transaction};
+
+    #[test]
+    fn test_new() {
+        let mut spi = SpiMock::new(&[]);
+        let driver = Max7219::new(&mut spi);
+        // Default device count => 1
+        assert_eq!(driver.device_count(), 1);
+
+        spi.done();
+    }
+
+    #[test]
+    fn test_with_device_count_valid() {
+        let mut spi = SpiMock::new(&[]);
+        let driver = Max7219::new(&mut spi);
+        let driver = driver
+            .with_device_count(4)
+            .expect("Should accept valid count");
+        assert_eq!(driver.device_count(), 4);
+        spi.done();
+    }
+
+    #[test]
+    fn test_with_device_count_invalid() {
+        let mut spi = SpiMock::new(&[]);
+        let driver = Max7219::new(&mut spi);
+        let result = driver.with_device_count(MAX_DISPLAYS + 1);
+        assert!(matches!(result, Err(Error::InvalidDeviceCount)));
+
+        spi.done();
+    }
+
+    #[test]
+    fn test_power_on() {
+        let expected_transactions = [
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![Register::Shutdown.addr(), 0x01]),
+            Transaction::transaction_end(),
+        ];
+        let mut spi = SpiMock::new(&expected_transactions);
+        let mut driver = Max7219::new(&mut spi);
+
+        driver.power_on().expect("Power on should succeed");
+        spi.done();
+    }
+
+    #[test]
+    fn test_power_off() {
+        let expected_transactions = [
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![Register::Shutdown.addr(), 0x00]),
+            Transaction::transaction_end(),
+        ];
+        let mut spi = SpiMock::new(&expected_transactions);
+        let mut driver = Max7219::new(&mut spi);
+
+        driver.power_off().expect("Power off should succeed");
+        spi.done();
+    }
+
+    #[test]
+    fn test_power_on_device() {
+        let expected_transactions = [
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![Register::Shutdown.addr(), 0x01]),
+            Transaction::transaction_end(),
+        ];
+        let mut spi = SpiMock::new(&expected_transactions);
+        let mut driver = Max7219::new(&mut spi);
+
+        driver
+            .power_on_device(0)
+            .expect("Power on display should succeed");
+        spi.done();
+    }
+
+    // Test with multiple devices - power_on
+    #[test]
+    fn test_power_on_multiple_devices() {
+        let device_count = 3;
+
+        let expected_transactions = [
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![
+                Register::Shutdown.addr(),
+                0x01,
+                Register::Shutdown.addr(),
+                0x01,
+                Register::Shutdown.addr(),
+                0x01,
+            ]),
+            Transaction::transaction_end(),
+        ];
+        let mut spi = SpiMock::new(&expected_transactions);
+        let mut driver = Max7219::new(&mut spi)
+            .with_device_count(device_count)
+            .expect("Should accept valid count");
+
+        driver.power_on().expect("Power on should succeed");
+        spi.done();
+    }
+
+    #[test]
+    fn test_power_off_device() {
+        let expected_transactions = [
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![
+                // For 4 devices
+                Register::NoOp.addr(),
+                0x00,
+                Register::NoOp.addr(),
+                0x00,
+                Register::Shutdown.addr(),
+                0x00,
+                Register::NoOp.addr(),
+                0x00,
+            ]),
+            Transaction::transaction_end(),
+        ];
+        let mut spi = SpiMock::new(&expected_transactions);
+        let mut driver = Max7219::new(&mut spi)
+            .with_device_count(4)
+            .expect("a valid device count");
+
+        driver
+            .power_off_device(2)
+            .expect("Power off display should succeed");
+        spi.done();
+    }
+
+    #[test]
+    fn test_power_device_invalid_index() {
+        let mut spi = SpiMock::new(&[]);
+        let mut driver = Max7219::new(&mut spi).with_device_count(1).unwrap();
+
+        let result = driver.power_on_device(1);
+        assert_eq!(result, Err(Error::InvalidDeviceIndex));
+
+        let result = driver.power_off_device(1);
+        assert_eq!(result, Err(Error::InvalidDeviceIndex));
+        spi.done();
+    }
+
+    #[test]
+    fn test_test_all_enable() {
+        let expected_transactions = [
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![
+                Register::DisplayTest.addr(),
+                0x01,
+                Register::DisplayTest.addr(),
+                0x01,
+                Register::DisplayTest.addr(),
+                0x01,
+                Register::DisplayTest.addr(),
+                0x01,
+            ]),
+            Transaction::transaction_end(),
+        ];
+        let mut spi = SpiMock::new(&expected_transactions);
+        let mut driver = Max7219::new(&mut spi)
+            .with_device_count(4)
+            .expect("valid device count");
+
+        driver
+            .test_all(true)
+            .expect("Test all enable should succeed");
+        spi.done();
+    }
+
+    #[test]
+    fn test_test_all_disable() {
+        let expected_transactions = [
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![Register::DisplayTest.addr(), 0x00]),
+            Transaction::transaction_end(),
+        ];
+        let mut spi = SpiMock::new(&expected_transactions);
+        let mut driver = Max7219::new(&mut spi);
+
+        driver
+            .test_all(false)
+            .expect("Test all disable should succeed");
+        spi.done();
+    }
+
+    #[test]
+    fn test_set_scan_limit_all_valid() {
+        let limit = 4;
+        let expected_transactions = [
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![Register::ScanLimit.addr(), limit - 1]),
+            Transaction::transaction_end(),
+        ];
+        let mut spi = SpiMock::new(&expected_transactions);
+        let mut driver = Max7219::new(&mut spi);
+
+        driver
+            .set_scan_limit_all(limit)
+            .expect("Set scan limit should succeed");
+        spi.done();
+    }
+
+    #[test]
+    fn test_set_scan_limit_all_invalid_low() {
+        let mut spi = SpiMock::new(&[]);
+        let mut driver = Max7219::new(&mut spi);
+
+        let result = driver.set_scan_limit_all(0);
+        assert_eq!(result, Err(Error::InvalidScanLimit));
+        spi.done();
+    }
+
+    #[test]
+    fn test_set_scan_limit_all_invalid_high() {
+        let mut spi = SpiMock::new(&[]); // No transactions expected for invalid input
+        let mut driver = Max7219::new(&mut spi);
+
+        let result = driver.set_scan_limit_all(9);
+        assert_eq!(result, Err(Error::InvalidScanLimit));
+        spi.done();
+    }
+
+    #[test]
+    fn test_set_decode_mode_all() {
+        let mode = DecodeMode::AllDigits;
+        let expected_transactions = [
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![
+                Register::DecodeMode.addr(),
+                mode.value(),
+                Register::DecodeMode.addr(),
+                mode.value(),
+                Register::DecodeMode.addr(),
+                mode.value(),
+                Register::DecodeMode.addr(),
+                mode.value(),
+            ]),
+            Transaction::transaction_end(),
+        ];
+        let mut spi = SpiMock::new(&expected_transactions);
+        let mut driver = Max7219::new(&mut spi)
+            .with_device_count(4)
+            .expect("valid device count");
+
+        driver
+            .set_decode_mode_all(mode)
+            .expect("Set decode mode should succeed");
+        spi.done();
+    }
+
+    #[test]
+    fn test_clear_display() {
+        let mut expected_transactions = Vec::new();
+        for digit_register in Register::digits() {
+            expected_transactions.push(Transaction::transaction_start());
+            expected_transactions.push(Transaction::write_vec(vec![digit_register.addr(), 0x00]));
+            expected_transactions.push(Transaction::transaction_end());
         }
-        Ok(())
+
+        let mut spi = SpiMock::new(&expected_transactions);
+        let mut driver = Max7219::new(&mut spi);
+
+        driver
+            .clear_display(0)
+            .expect("Clear display should succeed");
+        spi.done();
+    }
+
+    #[test]
+    fn test_clear_display_invalid_index() {
+        let mut spi = SpiMock::new(&[]); // No transactions expected for invalid index
+        let mut driver = Max7219::new(&mut spi)
+            .with_device_count(1)
+            .expect("valid device count");
+
+        let result = driver.clear_display(1);
+        assert_eq!(result, Err(Error::InvalidDeviceIndex));
+        spi.done();
+    }
+
+    #[test]
+    fn test_write_raw_digit() {
+        let device_index = 0;
+        let digit = 3;
+        let data = 0b10101010;
+        let expected_transactions = [
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![Register::Digit3.addr(), data]),
+            Transaction::transaction_end(),
+        ];
+        let mut spi = SpiMock::new(&expected_transactions);
+        let mut driver = Max7219::new(&mut spi);
+
+        driver
+            .write_raw_digit(device_index, digit, data)
+            .expect("Write raw digit should succeed");
+        spi.done();
+    }
+
+    #[test]
+    fn test_write_raw_digit_invalid_digit() {
+        let mut spi = SpiMock::new(&[]); // No transactions expected for invalid digit
+        let mut driver = Max7219::new(&mut spi);
+
+        let result = driver.write_raw_digit(0, 8, 0x00); // Digit 8 is invalid
+
+        assert_eq!(result, Err(Error::InvalidDigit));
+
+        spi.done();
+    }
+
+    #[test]
+    fn test_set_intensity_valid() {
+        let device_index = 0;
+        let intensity = 0x0A;
+        let expected_transactions = [
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![Register::Intensity.addr(), intensity]),
+            Transaction::transaction_end(),
+        ];
+        let mut spi = SpiMock::new(&expected_transactions);
+        let mut driver = Max7219::new(&mut spi);
+
+        driver
+            .set_intensity(device_index, intensity)
+            .expect("Set intensity should succeed");
+        spi.done();
+    }
+
+    #[test]
+    fn test_set_intensity_invalid() {
+        let mut spi = SpiMock::new(&[]); // No transactions expected for invalid input
+        let mut driver = Max7219::new(&mut spi);
+
+        let result = driver.set_intensity(0, 0x10); // Invalid intensity > 0x0F
+        assert_eq!(result, Err(Error::InvalidIntensity));
+        spi.done();
+    }
+
+    #[test]
+    fn test_init() {
+        // Mock the sequence of calls made by init() for 1 device
+        // 1. power_on() -> Shutdown 0x01
+        // 2. test_all(false) -> DisplayTest 0x00
+        // 3. set_scan_limit_all(NUM_DIGITS) -> ScanLimit (NUM_DIGITS-1)
+        // 4. set_decode_mode_all(NoDecode) -> DecodeMode 0x00
+        // 5. clear_all() -> 8 separate calls to write_all_registers for each digit reg
+
+        // Use vec![] macro to create the vector with all expected transactions
+        let expected_transactions = vec![
+            // 1. power_on (write_all_registers)
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![Register::Shutdown.addr(), 0x01]),
+            Transaction::transaction_end(),
+            // 2. test_all(false) (write_all_registers)
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![Register::DisplayTest.addr(), 0x00]),
+            Transaction::transaction_end(),
+            // 3. set_scan_limit_all (write_all_registers)
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![Register::ScanLimit.addr(), NUM_DIGITS - 1]),
+            Transaction::transaction_end(),
+            // 4. set_decode_mode_all (write_all_registers)
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![
+                Register::DecodeMode.addr(),
+                DecodeMode::NoDecode.value(),
+            ]),
+            Transaction::transaction_end(),
+            // 5. clear_all() - 8 separate write_all_registers calls, one for each digit reg
+            // Unroll the loop for clarity and to include all transactions in the vec![] macro
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![Register::Digit0.addr(), 0x00]),
+            Transaction::transaction_end(),
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![Register::Digit1.addr(), 0x00]),
+            Transaction::transaction_end(),
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![Register::Digit2.addr(), 0x00]),
+            Transaction::transaction_end(),
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![Register::Digit3.addr(), 0x00]),
+            Transaction::transaction_end(),
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![Register::Digit4.addr(), 0x00]),
+            Transaction::transaction_end(),
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![Register::Digit5.addr(), 0x00]),
+            Transaction::transaction_end(),
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![Register::Digit6.addr(), 0x00]),
+            Transaction::transaction_end(),
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![Register::Digit7.addr(), 0x00]),
+            Transaction::transaction_end(),
+        ];
+
+        let mut spi = SpiMock::new(&expected_transactions);
+        let mut driver = Max7219::new(&mut spi);
+
+        driver.init().expect("Init should succeed");
+        spi.done();
+    }
+
+    #[test]
+    fn test_write_device_register_invalid_index() {
+        let mut spi = SpiMock::new(&[]); // No SPI transactions expected
+        let mut driver = Max7219::new(&mut spi)
+            .with_device_count(2)
+            .expect("Should accept valid count");
+
+        let result = driver.write_device_register(2, Register::Shutdown, 0x01); // Index 2 is invalid for device_count=2
+        assert_eq!(result, Err(Error::InvalidDeviceIndex));
+
+        spi.done();
+    }
+
+    #[test]
+    fn test_write_all_registers_valid() {
+        let expected_transactions = [
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![
+                Register::Intensity.addr(),
+                0x01,
+                Register::Intensity.addr(),
+                0x01,
+            ]),
+            Transaction::transaction_end(),
+        ];
+        let mut spi = SpiMock::new(&expected_transactions);
+        let mut driver = Max7219::new(&mut spi)
+            .with_device_count(2)
+            .expect("Should accept valid count");
+
+        driver
+            .write_all_registers(&[(Register::Intensity, 0x01), (Register::Intensity, 0x01)])
+            .expect("should  write all registers");
+
+        spi.done();
+    }
+
+    #[test]
+    fn test_test_device_enable_disable() {
+        let expected_transactions = [
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![Register::DisplayTest.addr(), 0x01]),
+            Transaction::transaction_end(),
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![Register::DisplayTest.addr(), 0x00]),
+            Transaction::transaction_end(),
+        ];
+        let mut spi = SpiMock::new(&expected_transactions);
+        let mut driver = Max7219::new(&mut spi);
+
+        driver
+            .test_device(0, true)
+            .expect("Enable test mode failed");
+        driver
+            .test_device(0, false)
+            .expect("Disable test mode failed");
+        spi.done();
+    }
+
+    #[test]
+    fn test_set_device_scan_limit_valid() {
+        let scan_limit = 4;
+
+        let expected_transactions = [
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![Register::ScanLimit.addr(), scan_limit - 1]),
+            Transaction::transaction_end(),
+        ];
+        let mut spi = SpiMock::new(&expected_transactions);
+        let mut driver = Max7219::new(&mut spi);
+
+        driver
+            .set_device_scan_limit(0, scan_limit)
+            .expect("Scan limit set failed");
+        spi.done();
+    }
+
+    #[test]
+    fn test_set_device_scan_limit_invalid() {
+        let mut spi = SpiMock::new(&[]);
+        let mut driver = Max7219::new(&mut spi);
+
+        let result = driver.set_device_scan_limit(0, 0); // invalid: below range
+        assert_eq!(result, Err(Error::InvalidScanLimit));
+
+        let result = driver.set_device_scan_limit(0, 9); // invalid: above range
+        assert_eq!(result, Err(Error::InvalidScanLimit));
+        spi.done();
+    }
+
+    #[test]
+    fn test_set_device_decode_mode() {
+        let mode = DecodeMode::Digits0To3;
+        let expected_transactions = [
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![Register::DecodeMode.addr(), mode.value()]),
+            Transaction::transaction_end(),
+        ];
+        let mut spi = SpiMock::new(&expected_transactions);
+        let mut driver = Max7219::new(&mut spi);
+
+        driver
+            .set_device_decode_mode(0, mode)
+            .expect("Set decode mode failed");
+        spi.done();
+    }
+
+    #[test]
+    fn test_set_intensity_all() {
+        let intensity = 0x05;
+        let expected_transactions = [
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![
+                Register::Intensity.addr(),
+                intensity,
+                Register::Intensity.addr(),
+                intensity,
+            ]),
+            Transaction::transaction_end(),
+        ];
+        let mut spi = SpiMock::new(&expected_transactions);
+        let mut driver = Max7219::new(&mut spi)
+            .with_device_count(2)
+            .expect("valid count");
+
+        driver
+            .set_intensity_all(intensity)
+            .expect("Set intensity all failed");
+        spi.done();
     }
 }

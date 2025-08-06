@@ -219,4 +219,18 @@ mod tests {
         assert_eq!(buffer.get_row(8), Err(Error::BufferError));
         assert_eq!(buffer.get_row(255), Err(Error::BufferError));
     }
+
+    #[test]
+    fn test_data_mut() {
+        let mut buffer = MatrixBuffer::new();
+        let data_mut = buffer.data_mut();
+
+        // Modify the buffer through the mutable reference
+        data_mut[0] = 0b10101010;
+        data_mut[1] = 0b01010101;
+
+        // Confirm that the internal data was updated
+        assert_eq!(buffer.data()[0], 0b10101010);
+        assert_eq!(buffer.data()[1], 0b01010101);
+    }
 }

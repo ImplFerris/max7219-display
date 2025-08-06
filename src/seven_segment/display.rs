@@ -40,7 +40,7 @@ where
     /// # Arguments
     ///
     /// * `spi` - The SPI device used for communication.
-    /// * `display_count` - Number of daisy-chained MAX7219 displays.
+    /// * `device_count` - Number of daisy-chained MAX7219 devices.
     ///
     /// # Returns
     ///
@@ -53,8 +53,8 @@ where
     /// let spi = /* your SPI device */;
     /// let mut display = SevenSegment::from_spi(spi, 4).unwrap();
     /// ```
-    pub fn from_spi(spi: SPI, display_count: usize) -> Result<Self> {
-        let mut driver = Max7219::new(spi).with_device_count(display_count)?;
+    pub fn from_spi(spi: SPI, device_count: usize) -> Result<Self> {
+        let mut driver = Max7219::new(spi).with_device_count(device_count)?;
         driver.init()?;
         Ok(Self { driver })
     }
@@ -165,5 +165,306 @@ where
         self.driver.write_raw_digit(0, digit, data)?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        Error, Max7219, Register,
+        seven_segment::{STANDARD_FONT, SevenSegment, fonts},
+    };
+    use embedded_hal_mock::eh1::{spi::Mock as SpiMock, spi::Transaction};
+
+    #[test]
+    fn test_from_spi() {
+        let device_count = 2;
+        // Expected transactions for Max7219::init() on 2 devices
+        let expected_transactions = vec![
+            // power_on (2 devices)
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![
+                Register::Shutdown.addr(),
+                0x01,
+                Register::Shutdown.addr(),
+                0x01,
+            ]),
+            Transaction::transaction_end(),
+            // test_all(false) (2 devices)
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![
+                Register::DisplayTest.addr(),
+                0x00,
+                Register::DisplayTest.addr(),
+                0x00,
+            ]),
+            Transaction::transaction_end(),
+            // set_scan_limit_all(NUM_DIGITS) (2 devices)
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![
+                Register::ScanLimit.addr(),
+                crate::NUM_DIGITS - 1,
+                Register::ScanLimit.addr(),
+                crate::NUM_DIGITS - 1,
+            ]),
+            Transaction::transaction_end(),
+            // set_decode_mode_all(NoDecode) (2 devices)
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![
+                Register::DecodeMode.addr(),
+                crate::registers::DecodeMode::NoDecode as u8,
+                Register::DecodeMode.addr(),
+                crate::registers::DecodeMode::NoDecode as u8,
+            ]),
+            Transaction::transaction_end(),
+            // clear_all() - 8 transactions for 8 digits, each affecting 2 devices
+            // Digit0
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![
+                Register::Digit0.addr(),
+                0x00,
+                Register::Digit0.addr(),
+                0x00,
+            ]),
+            Transaction::transaction_end(),
+            // Digit1
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![
+                Register::Digit1.addr(),
+                0x00,
+                Register::Digit1.addr(),
+                0x00,
+            ]),
+            Transaction::transaction_end(),
+            // Digit2
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![
+                Register::Digit2.addr(),
+                0x00,
+                Register::Digit2.addr(),
+                0x00,
+            ]),
+            Transaction::transaction_end(),
+            // Digit3
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![
+                Register::Digit3.addr(),
+                0x00,
+                Register::Digit3.addr(),
+                0x00,
+            ]),
+            Transaction::transaction_end(),
+            // Digit4
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![
+                Register::Digit4.addr(),
+                0x00,
+                Register::Digit4.addr(),
+                0x00,
+            ]),
+            Transaction::transaction_end(),
+            // Digit5
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![
+                Register::Digit5.addr(),
+                0x00,
+                Register::Digit5.addr(),
+                0x00,
+            ]),
+            Transaction::transaction_end(),
+            // Digit6
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![
+                Register::Digit6.addr(),
+                0x00,
+                Register::Digit6.addr(),
+                0x00,
+            ]),
+            Transaction::transaction_end(),
+            // Digit7
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![
+                Register::Digit7.addr(),
+                0x00,
+                Register::Digit7.addr(),
+                0x00,
+            ]),
+            Transaction::transaction_end(),
+        ];
+
+        let mut spi = SpiMock::new(&expected_transactions);
+        let result = SevenSegment::from_spi(&mut spi, device_count);
+
+        assert!(result.is_ok());
+
+        spi.done();
+    }
+
+    #[test]
+    fn test_from_spi_invalid_count() {
+        let mut spi = SpiMock::new(&[]); // No SPI calls expected if count is invalid
+        let result = SevenSegment::from_spi(&mut spi, crate::MAX_DISPLAYS + 1);
+
+        assert!(matches!(result, Err(Error::InvalidDeviceCount)));
+
+        spi.done();
+    }
+
+    #[test]
+    fn test_write_char() {
+        let ch = 'R';
+        let digit = 2;
+        let font = fonts::STANDARD_FONT;
+        let expected_data = font.get_char(ch);
+
+        // Expected transaction for writing to digit 2 on device 0
+        let expected_transactions = [
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![Register::Digit2.addr(), expected_data]),
+            Transaction::transaction_end(),
+        ];
+
+        let mut spi = SpiMock::new(&expected_transactions);
+        let driver = Max7219::new(&mut spi);
+        let mut display = SevenSegment::new(driver);
+
+        let result = display.write_char(digit, ch, &font);
+        assert!(result.is_ok());
+        spi.done();
+    }
+
+    #[test]
+    fn test_write_char_to_device() {
+        let device_index = 1;
+        let ch = '3';
+        let digit = 5;
+        let font = fonts::STANDARD_FONT;
+        let expected_data = font.get_char(ch);
+
+        let expected_transactions = [
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![
+                Register::NoOp.addr(),
+                0x00,
+                Register::Digit5.addr(),
+                expected_data,
+            ]),
+            Transaction::transaction_end(),
+        ];
+
+        let mut spi = SpiMock::new(&expected_transactions);
+        let driver = Max7219::new(&mut spi).with_device_count(2).unwrap();
+        let mut display = SevenSegment::new(driver);
+
+        let result = display.write_char_to_device(device_index, digit, ch, &font);
+        assert!(result.is_ok());
+        spi.done();
+    }
+
+    #[test]
+    fn test_write_char_to_device_invalid_index() {
+        let mut spi = SpiMock::new(&[]); // No SPI calls expected
+        let driver = Max7219::new(&mut spi).with_device_count(1).unwrap();
+        let mut display = SevenSegment::new(driver);
+
+        let result = display.write_char_to_device(1, 0, 'A', &STANDARD_FONT); // Index 1 is invalid for device_count=1
+        assert_eq!(result, Err(Error::InvalidDeviceIndex));
+        spi.done();
+    }
+
+    #[test]
+    fn test_write_char_invalid_digit() {
+        let mut spi = SpiMock::new(&[]); // No SPI calls expected
+        let driver = Max7219::new(&mut spi);
+        let mut display = SevenSegment::new(driver);
+
+        let result = display.write_char(8, 'A', &STANDARD_FONT); // Digit 8 is invalid
+        // This will fail inside Max7219::write_raw_digit -> Register::try_digit
+        assert_eq!(result, Err(Error::InvalidDigit));
+        spi.done();
+    }
+
+    #[test]
+    fn test_write_bcd_char() {
+        let ch = '5';
+        let digit = 3;
+        let expected_data = 0x05; // BCD for '5'
+
+        let expected_transactions = [
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![Register::Digit3.addr(), expected_data]),
+            Transaction::transaction_end(),
+        ];
+
+        let mut spi = SpiMock::new(&expected_transactions);
+        let driver = Max7219::new(&mut spi);
+        let mut display = SevenSegment::new(driver);
+
+        let result = display.write_bcd_char(digit, ch);
+        assert!(result.is_ok());
+        spi.done();
+    }
+
+    #[test]
+    fn test_write_bcd_char_dash() {
+        let ch = '-';
+        let digit = 1;
+        let expected_data = 0x0A;
+
+        let expected_transactions = [
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![Register::Digit1.addr(), expected_data]),
+            Transaction::transaction_end(),
+        ];
+
+        let mut spi = SpiMock::new(&expected_transactions);
+        let driver = Max7219::new(&mut spi);
+        let mut display = SevenSegment::new(driver);
+
+        let result = display.write_bcd_char(digit, ch);
+        assert!(result.is_ok());
+        spi.done();
+    }
+
+    #[test]
+    fn test_write_bcd_char_unsupported() {
+        let mut spi = SpiMock::new(&[]); // No SPI calls expected
+        let driver = Max7219::new(&mut spi);
+        let mut display = SevenSegment::new(driver);
+
+        let result = display.write_bcd_char(0, 'X'); // 'X' is not supported in BCD mode
+        assert_eq!(result, Err(Error::UnsupportedChar));
+        spi.done();
+    }
+
+    #[test]
+    fn test_write_bcd_char_invalid_digit() {
+        let mut spi = SpiMock::new(&[]); // No SPI calls expected
+        let driver = Max7219::new(&mut spi);
+        let mut display = SevenSegment::new(driver);
+
+        let result = display.write_bcd_char(8, '0'); // Digit 8 is invalid
+        // This will fail inside Max7219::write_raw_digit -> Register::try_digit
+        assert_eq!(result, Err(Error::InvalidDigit));
+        spi.done();
+    }
+
+    // Test driver() method indirectly by using it to call a Max7219 function
+    #[test]
+    fn test_driver_mut_access() {
+        let expected_transactions = [
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![Register::Shutdown.addr(), 0x01]),
+            Transaction::transaction_end(),
+        ];
+        let mut spi = SpiMock::new(&expected_transactions);
+        let driver = Max7219::new(&mut spi);
+        let mut display = SevenSegment::new(driver);
+
+        // Use the driver() method to access the underlying driver and call power_on
+        let result = display.driver().power_on();
+        assert!(result.is_ok());
+
+        spi.done();
     }
 }
