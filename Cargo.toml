@@ -23,3 +23,6 @@ graphics = ["dep:embedded-graphics-core"]
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
+
+[dev-dependencies]
+embedded-hal-mock = { version = "0.11.1", "features" = ["eh1"] }

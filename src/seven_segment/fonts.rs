@@ -56,3 +56,55 @@ pub const STANDARD_FONT: Font = Font::new(&[
     ('-', 0b00000001), // -
     (' ', 0b00000000), // Space
 ]);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_standard_font_known_chars() {
+        // Test a selection of characters from the standard font
+        assert_eq!(STANDARD_FONT.get_char('0'), 0b01111110);
+        assert_eq!(STANDARD_FONT.get_char('1'), 0b00110000);
+        assert_eq!(STANDARD_FONT.get_char('2'), 0b01101101);
+        assert_eq!(STANDARD_FONT.get_char('A'), 0b01110111);
+        assert_eq!(STANDARD_FONT.get_char('F'), 0b01000111);
+        assert_eq!(STANDARD_FONT.get_char('-'), 0b00000001);
+        assert_eq!(STANDARD_FONT.get_char(' '), 0b00000000);
+    }
+
+    #[test]
+    fn test_standard_font_unknown_char() {
+        // Test that unknown characters return 0 (blank)
+        assert_eq!(STANDARD_FONT.get_char('z'), 0b00000000);
+        assert_eq!(STANDARD_FONT.get_char('€'), 0b00000000);
+        assert_eq!(STANDARD_FONT.get_char('@'), 0b00000000);
+    }
+
+    #[test]
+    fn test_custom_font() {
+        // Create a custom font for testing
+        const CUSTOM_FONT_DATA: &[(char, u8)] = &[('X', 0b10101010), ('Y', 0b01010101)];
+
+        let custom_font = Font::new(CUSTOM_FONT_DATA);
+
+        // Test known characters
+        assert_eq!(custom_font.get_char('X'), 0b10101010);
+        assert_eq!(custom_font.get_char('Y'), 0b01010101);
+
+        // Test unknown character
+        assert_eq!(custom_font.get_char('Z'), 0b00000000);
+    }
+
+    #[test]
+    fn test_font_new() {
+        // Test that Font::new creates a font with the correct character map
+        const TEST_DATA: &[(char, u8)] = &[('A', 0xFF), ('B', 0x00)];
+        let font = Font::new(TEST_DATA);
+
+        // Verify the font works correctly
+        assert_eq!(font.get_char('A'), 0xFF);
+        assert_eq!(font.get_char('B'), 0x00);
+        assert_eq!(font.get_char('C'), 0x00); // Unknown char
+    }
+}

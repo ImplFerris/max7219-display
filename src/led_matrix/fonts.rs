@@ -1275,3 +1275,97 @@ pub const FONT8X8: &[([u8; 8], char)] = &[
         '~',
     ),
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new_font() {
+        // Create a minimal font for testing
+        const TEST_FONT_DATA: &[([u8; 8], char)] = &[
+            (
+                [
+                    0b00111100, 0b01100110, 0b01101110, 0b01110110, 0b01100110, 0b01100110,
+                    0b00111100, 0b00000000,
+                ],
+                '0',
+            ),
+            (
+                [
+                    0b00011000, 0b00111000, 0b00011000, 0b00011000, 0b00011000, 0b00011000,
+                    0b01111110, 0b00000000,
+                ],
+                '1',
+            ),
+        ];
+
+        let font = LedFont::new(TEST_FONT_DATA);
+        assert_eq!(font.char_map, TEST_FONT_DATA);
+    }
+
+    #[test]
+    fn test_get_char_existing() {
+        // Test getting bitmap for existing characters
+        let bitmap_0 = STANDARD_LED_FONT.get_char('0');
+        let expected_0 = [
+            0b00111100, 0b01100110, 0b01101110, 0b01110110, 0b01100110, 0b01100110, 0b00111100,
+            0b00000000,
+        ];
+        assert_eq!(bitmap_0, expected_0);
+
+        let bitmap_a = STANDARD_LED_FONT.get_char('A');
+        let expected_a = [
+            0b00011000, 0b00111100, 0b01100110, 0b01100110, 0b01111110, 0b01100110, 0b01100110,
+            0b00000000,
+        ];
+        assert_eq!(bitmap_a, expected_a);
+    }
+
+    #[test]
+    fn test_get_char_missing() {
+        // Test getting bitmap for non-existing character
+        let bitmap_unknown = STANDARD_LED_FONT.get_char('€');
+        assert_eq!(bitmap_unknown, FONT8X8_UNKNOWN);
+    }
+
+    #[test]
+    fn test_get_char_case_sensitivity() {
+        // Test that uppercase and lowercase are different
+        let bitmap_upper_a = STANDARD_LED_FONT.get_char('A');
+        let bitmap_lower_a = STANDARD_LED_FONT.get_char('a');
+
+        assert_ne!(bitmap_upper_a, bitmap_lower_a);
+
+        let expected_upper_a = [
+            0b00011000, 0b00111100, 0b01100110, 0b01100110, 0b01111110, 0b01100110, 0b01100110,
+            0b00000000,
+        ];
+
+        let expected_lower_a = [
+            0b00000000, 0b00000000, 0b01111000, 0b00001100, 0b01111100, 0b11001100, 0b01110110,
+            0b00000000,
+        ];
+
+        assert_eq!(bitmap_upper_a, expected_upper_a);
+        assert_eq!(bitmap_lower_a, expected_lower_a);
+    }
+
+    #[test]
+    fn test_special_characters() {
+        // Test a few special characters to ensure they're in the font
+        let space_bitmap = STANDARD_LED_FONT.get_char(' ');
+        let expected_space = [
+            0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000,
+            0b00000000,
+        ];
+        assert_eq!(space_bitmap, expected_space);
+
+        let exclamation_bitmap = STANDARD_LED_FONT.get_char('!');
+        let expected_exclamation = [
+            0b00011000, 0b00011000, 0b00011000, 0b00011000, 0b00011000, 0b00000000, 0b00011000,
+            0b00000000,
+        ];
+        assert_eq!(exclamation_bitmap, expected_exclamation);
+    }
+}

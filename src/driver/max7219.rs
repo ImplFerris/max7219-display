@@ -3,7 +3,7 @@
 use embedded_hal::spi::SpiDevice;
 
 use crate::{
-    MAX_DISPLAYS, NUM_DIGITS,
+    MAX_DISPLAYS, NUM_DIGITS, Result,
     error::Error,
     registers::{DecodeMode, Register},
 };
@@ -55,16 +55,16 @@ where
     /// ```rust,ignore
     /// let driver = Max7219::new(spi).with_device_count(4)?;
     /// ```
-    pub fn with_device_count(mut self, count: usize) -> Result<Self, Error<SPI::Error>> {
+    pub fn with_device_count(mut self, count: usize) -> Result<Self> {
         if count > MAX_DISPLAYS {
-            return Err(Error::InvalidDisplayCount);
+            return Err(Error::InvalidDeviceCount);
         }
         self.device_count = count;
         Ok(self)
     }
 
     /// Initializes all configured displays.
-    pub fn init(&mut self) -> Result<(), Error<SPI::Error>> {
+    pub fn init(&mut self) -> Result<()> {
         self.power_on()?;
 
         self.test_all(false)?;
@@ -106,9 +106,9 @@ where
         device_index: usize,
         register: Register,
         data: u8,
-    ) -> Result<(), Error<SPI::Error>> {
+    ) -> Result<()> {
         if device_index >= self.device_count {
-            return Err(Error::InvalidDisplayIndex);
+            return Err(Error::InvalidDeviceIndex);
         }
 
         self.buffer = [0; MAX_DISPLAYS * 2];
@@ -135,10 +135,7 @@ where
     ///
     /// # Errors
     /// - Returns an SPI error if the write operation fails.
-    pub(crate) fn write_all_registers(
-        &mut self,
-        ops: &[(Register, u8)],
-    ) -> Result<(), Error<SPI::Error>> {
+    pub(crate) fn write_all_registers(&mut self, ops: &[(Register, u8)]) -> Result<()> {
         debug_assert!(
             ops.len() == self.device_count,
             "ops.len() = {}, expected {}",
@@ -167,14 +164,14 @@ where
     // }
 
     /// Powers on all displays by writing `0x01` to the Shutdown register.
-    pub fn power_on(&mut self) -> Result<(), Error<SPI::Error>> {
+    pub fn power_on(&mut self) -> Result<()> {
         let ops = [(Register::Shutdown, 0x01); MAX_DISPLAYS];
 
         self.write_all_registers(&ops[..self.device_count])
     }
 
     /// Powers off all displays by writing `0x00` to the Shutdown register.
-    pub fn power_off(&mut self) -> Result<(), Error<SPI::Error>> {
+    pub fn power_off(&mut self) -> Result<()> {
         let ops = [(Register::Shutdown, 0x00); MAX_DISPLAYS];
 
         self.write_all_registers(&ops[..self.device_count])
@@ -185,7 +182,7 @@ where
     /// # Arguments
     ///
     /// * `device_index` - The index of the display to power on.
-    pub fn power_on_display(&mut self, device_index: usize) -> Result<(), Error<SPI::Error>> {
+    pub fn power_on_display(&mut self, device_index: usize) -> Result<()> {
         self.write_device_register(device_index, Register::Shutdown, 0x01)
     }
 
@@ -194,24 +191,20 @@ where
     /// # Arguments
     ///
     /// * `device_index` - The index of the display to power off.
-    pub fn power_off_display(&mut self, device_index: usize) -> Result<(), Error<SPI::Error>> {
+    pub fn power_off_display(&mut self, device_index: usize) -> Result<()> {
         self.write_device_register(device_index, Register::Shutdown, 0x00)
     }
 
     /// Enables or disables display test mode on a specific device.
     ///
     /// When enabled, all LEDs on that device are lit regardless of current device data.
-    pub fn test_device(
-        &mut self,
-        device_index: usize,
-        enable: bool,
-    ) -> Result<(), Error<SPI::Error>> {
+    pub fn test_device(&mut self, device_index: usize, enable: bool) -> Result<()> {
         let data = if enable { 0x01 } else { 0x00 };
         self.write_device_register(device_index, Register::DisplayTest, data)
     }
 
     /// Enable or disable display test mode on all devices in one SPI transaction.
-    pub fn test_all(&mut self, enable: bool) -> Result<(), Error<SPI::Error>> {
+    pub fn test_all(&mut self, enable: bool) -> Result<()> {
         let data = if enable { 0x01 } else { 0x00 };
         let ops: [(Register, u8); MAX_DISPLAYS] = [(Register::DisplayTest, data); MAX_DISPLAYS];
         self.write_all_registers(&ops[..self.device_count])
@@ -230,11 +223,7 @@ where
     ///
     /// # Errors
     /// Returns `Error::InvalidScanLimit` if the value is not in the range 1 to 8.
-    pub fn set_device_scan_limit(
-        &mut self,
-        device_index: usize,
-        limit: u8,
-    ) -> Result<(), Error<SPI::Error>> {
+    pub fn set_device_scan_limit(&mut self, device_index: usize, limit: u8) -> Result<()> {
         if !(1..=8).contains(&limit) {
             return Err(Error::InvalidScanLimit);
         }
@@ -245,7 +234,7 @@ where
     /// Set scan‐limit on all devices in one go.
     ///
     /// `limit` must be in 1..=8. Internally sends `limit - 1` to each chip.
-    pub fn set_scan_limit_all(&mut self, limit: u8) -> Result<(), Error<SPI::Error>> {
+    pub fn set_scan_limit_all(&mut self, limit: u8) -> Result<()> {
         if !(1..=8).contains(&limit) {
             return Err(Error::InvalidScanLimit);
         }
@@ -263,16 +252,12 @@ where
     /// should be decoded automatically.
     ///
     /// The `device_index` selects the target device. For a single device setup, use `0`.
-    pub fn set_device_decode_mode(
-        &mut self,
-        device_index: usize,
-        mode: DecodeMode,
-    ) -> Result<(), Error<SPI::Error>> {
+    pub fn set_device_decode_mode(&mut self, device_index: usize, mode: DecodeMode) -> Result<()> {
         self.write_device_register(device_index, Register::DecodeMode, mode as u8)
     }
 
     /// Set decode‐mode on all devices in one go.
-    pub fn set_decode_mode_all(&mut self, mode: DecodeMode) -> Result<(), Error<SPI::Error>> {
+    pub fn set_decode_mode_all(&mut self, mode: DecodeMode) -> Result<()> {
         let byte = mode as u8;
         let ops: [(Register, u8); MAX_DISPLAYS] = [(Register::DecodeMode, byte); MAX_DISPLAYS];
         self.write_all_registers(&ops[..self.device_count])
@@ -284,7 +269,7 @@ where
     /// digit registers (Register::Digit0 to Register::Digit7).
     ///
     /// This applies to a specific device in the daisy chain, selected by `device_index`.
-    pub fn clear_display(&mut self, device_index: usize) -> Result<(), Error<SPI::Error>> {
+    pub fn clear_display(&mut self, device_index: usize) -> Result<()> {
         for digit_register in Register::digits() {
             self.write_device_register(device_index, digit_register, 0x00)?;
         }
@@ -292,7 +277,7 @@ where
     }
 
     /// Clears all digits on all connected MAX7219 displays.
-    pub fn clear_all(&mut self) -> Result<(), Error<SPI::Error>> {
+    pub fn clear_all(&mut self) -> Result<()> {
         for digit_register in Register::digits() {
             let ops = [(digit_register, 0x00); MAX_DISPLAYS];
             self.write_all_registers(&ops[..self.device_count])?;
@@ -369,12 +354,7 @@ where
     /// - `device_index`: Index of the display in the daisy chain (0 = furthest from MCU)
     /// - `digit`: Which digit register to write to (`Digit::D0` to `Digit::D7`)
     /// - `value`: The raw 8-bit data to send to the digit register
-    pub fn write_raw_digit(
-        &mut self,
-        device_index: usize,
-        digit: u8,
-        value: u8,
-    ) -> Result<(), Error<SPI::Error>> {
+    pub fn write_raw_digit(&mut self, device_index: usize, digit: u8, value: u8) -> Result<()> {
         let digit_register = Register::try_digit(digit)?;
         self.write_device_register(device_index, digit_register, value)
     }
@@ -385,11 +365,7 @@ where
     ///
     /// - `device_index`: Index of the display in the daisy chain (0 = furthest from MCU)
     /// - `intensity`: Brightness level from `0` to `15` (`0x00` to `0x0F`)
-    pub fn set_intensity(
-        &mut self,
-        device_index: usize,
-        intensity: u8,
-    ) -> Result<(), Error<SPI::Error>> {
+    pub fn set_intensity(&mut self, device_index: usize, intensity: u8) -> Result<()> {
         if intensity > 0x0F {
             return Err(Error::InvalidIntensity);
         }
@@ -397,7 +373,7 @@ where
     }
 
     /// Set intensity for all displays
-    pub fn set_intensity_all(&mut self, intensity: u8) -> Result<(), Error<SPI::Error>> {
+    pub fn set_intensity_all(&mut self, intensity: u8) -> Result<()> {
         for device_index in 0..self.device_count {
             self.set_intensity(device_index, intensity)?;
         }

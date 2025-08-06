@@ -2,15 +2,15 @@
 
 /// Errors that can occur when using the MAX7219 driver
 #[derive(Debug, PartialEq, Eq)]
-pub enum Error<E> {
-    /// The specified display count is invalid (exceeds maximum allowed).
-    InvalidDisplayCount,
+pub enum Error {
+    /// The specified device count is invalid (exceeds maximum allowed).
+    InvalidDeviceCount,
     /// Invalid scan limit value (must be 0-7)
     InvalidScanLimit,
     /// The specified register address is not valid for the MAX7219.
     InvalidRegister,
-    /// Invalid display index (exceeds configured number of displays)
-    InvalidDisplayIndex,
+    /// Invalid device index (exceeds configured number of devices)
+    InvalidDeviceIndex,
     /// Invalid digit position (0-7 for MAX7219)
     InvalidDigit,
     /// Invalid intensity value (must be 0-15)
@@ -20,18 +20,18 @@ pub enum Error<E> {
     /// Buffer Error
     BufferError,
     /// SPI communication error
-    Spi(E),
+    SpiError,
 }
 
-impl<E> core::fmt::Display for Error<E> {
+impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Self::Spi(_) => write!(f, "SPI communication error"),
-            Self::InvalidDisplayIndex => write!(f, "Invalid display index"),
+            Self::SpiError => write!(f, "SPI communication error"),
+            Self::InvalidDeviceIndex => write!(f, "Invalid device index"),
             Self::InvalidDigit => write!(f, "Invalid digit"),
             Self::InvalidIntensity => write!(f, "Invalid intensity value"),
             Self::InvalidScanLimit => write!(f, "Invalid scan limit value"),
-            Self::InvalidDisplayCount => write!(f, "Invalid display count"),
+            Self::InvalidDeviceCount => write!(f, "Invalid device count"),
             Self::InvalidRegister => write!(f, "Invalid register address"),
             Self::UnsupportedChar => write!(f, "Unsupported Character"),
             Self::BufferError => write!(f, "LED Matrix buffer error"),
@@ -39,39 +39,89 @@ impl<E> core::fmt::Display for Error<E> {
     }
 }
 
-impl<E> From<E> for Error<E>
+/// Convert any embedded-hal SPI error into a general `SpiError`.
+///
+/// This allows using the `?` operator with SPI operations, automatically
+/// mapping their error into the driver's unified [`Error`] type.
+impl<E> From<E> for Error
 where
     E: embedded_hal::spi::Error,
 {
-    fn from(value: E) -> Self {
-        Self::Spi(value)
+    fn from(_value: E) -> Self {
+        Self::SpiError
     }
 }
 
-/// A digit value outside the valid range (0-7) was provided.
-#[derive(Debug, PartialEq, Eq)]
-pub enum DigitError {
-    /// The digit value must be between 0 and 7.
-    InvalidDigit,
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-impl<E> From<DigitError> for Error<E> {
-    fn from(_: DigitError) -> Self {
-        Error::InvalidDigit
+    // Mock SPI error for testing
+    #[derive(Debug)]
+    struct MockSpiError;
+
+    impl core::fmt::Display for MockSpiError {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            write!(f, "Mock SPI error")
+        }
     }
-}
 
-/// Errors related to matrix buffer operations.
-#[derive(Debug, PartialEq, Eq)]
-pub enum MatrixError {
-    /// A generic error related to buffer handling (e.g., invalid data or access).
-    BufferError,
-}
+    impl embedded_hal::spi::Error for MockSpiError {
+        fn kind(&self) -> embedded_hal::spi::ErrorKind {
+            embedded_hal::spi::ErrorKind::Other
+        }
+    }
 
-/// Converts a `MatrixError` into the main driver `Error` type.
-/// This allows matrix-specific errors to be unified under the general error system.
-impl<E> From<MatrixError> for Error<E> {
-    fn from(_: MatrixError) -> Self {
-        Error::BufferError
+    #[test]
+    fn test_error_device() {
+        assert_eq!(
+            format!("{}", Error::InvalidDeviceCount),
+            "Invalid device count"
+        );
+        assert_eq!(
+            format!("{}", Error::InvalidScanLimit),
+            "Invalid scan limit value"
+        );
+        assert_eq!(
+            format!("{}", Error::InvalidRegister),
+            "Invalid register address"
+        );
+        assert_eq!(
+            format!("{}", Error::InvalidDeviceIndex),
+            "Invalid device index"
+        );
+        assert_eq!(format!("{}", Error::InvalidDigit), "Invalid digit");
+        assert_eq!(
+            format!("{}", Error::InvalidIntensity),
+            "Invalid intensity value"
+        );
+        assert_eq!(
+            format!("{}", Error::UnsupportedChar),
+            "Unsupported Character"
+        );
+        assert_eq!(format!("{}", Error::BufferError), "LED Matrix buffer error");
+        assert_eq!(format!("{}", Error::SpiError), "SPI communication error");
+    }
+
+    #[test]
+    fn test_error_debug() {
+        // Test that Debug trait is implemented and works
+        let error = Error::InvalidDigit;
+        let debug_output = format!("{error:?}",);
+        assert!(debug_output.contains("InvalidDigit"));
+    }
+
+    #[test]
+    fn test_from_spi_error() {
+        let spi_error = MockSpiError;
+        let error: Error = spi_error.into();
+        assert_eq!(error, Error::SpiError);
+    }
+
+    #[test]
+    fn test_error_partialeq() {
+        // Test that all variants implement PartialEq correctly
+        assert!(Error::InvalidDeviceCount.eq(&Error::InvalidDeviceCount));
+        assert!(!Error::InvalidDeviceCount.eq(&Error::InvalidScanLimit));
     }
 }

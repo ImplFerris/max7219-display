@@ -3,7 +3,7 @@
 use embedded_hal::{delay::DelayNs, spi::SpiDevice};
 
 use crate::{
-    Error, MAX_DISPLAYS, Max7219, Register,
+    MAX_DISPLAYS, Max7219, Register, Result,
     led_matrix::{
         buffer::MatrixBuffer,
         fonts::{self, LedFont},
@@ -79,7 +79,7 @@ where
     /// let spi = /* your SPI device */;
     /// let mut matrix = LedMatrix::from_spi(spi, 4).unwrap();
     /// ```
-    pub fn from_spi(spi: SPI) -> Result<Self, Error<SPI::Error>> {
+    pub fn from_spi(spi: SPI) -> Result<Self> {
         let mut driver = Max7219::new(spi).with_device_count(DEVICE_COUNT)?;
         driver.init()?;
         Ok(Self {
@@ -96,21 +96,17 @@ where
     }
 
     /// Clear a specific device
-    pub fn clear(&mut self, device_index: usize) -> Result<(), Error<SPI::Error>> {
+    pub fn clear(&mut self, device_index: usize) -> Result<()> {
         self.driver.clear_display(device_index)
     }
 
     /// Clear all device
-    pub fn clear_all(&mut self) -> Result<(), Error<SPI::Error>> {
+    pub fn clear_all(&mut self) -> Result<()> {
         self.driver.clear_all()
     }
 
     /// Write a complete buffer to a specific display
-    pub fn write_buffer(
-        &mut self,
-        device_index: usize,
-        buffer: &MatrixBuffer,
-    ) -> Result<(), Error<SPI::Error>> {
+    pub fn write_buffer(&mut self, device_index: usize, buffer: &MatrixBuffer) -> Result<()> {
         for (row, &data) in buffer.data().iter().enumerate() {
             self.driver.write_raw_digit(device_index, row as u8, data)?;
         }
@@ -131,7 +127,7 @@ where
     ///
     /// # Errors
     /// Returns an error if the digit conversion fails or if SPI communication fails.
-    pub fn draw_char(&mut self, device_index: usize, ch: char) -> Result<(), Error<SPI::Error>> {
+    pub fn draw_char(&mut self, device_index: usize, ch: char) -> Result<()> {
         self.draw_char_with_font(device_index, ch, &fonts::STANDARD_LED_FONT)
     }
 
@@ -151,7 +147,7 @@ where
         device_index: usize,
         ch: char,
         font: &LedFont,
-    ) -> Result<(), Error<SPI::Error>> {
+    ) -> Result<()> {
         let bitmap = font.get_char(ch);
         // self.driver.draw_bitmap(bitmap, pos);
         for (row, value) in bitmap.iter().enumerate() {
@@ -164,18 +160,14 @@ where
     /// Draw a string of text on the LED matrix using the default font.
     /// Each character is displayed on one device in the daisy chain.
     /// If the string is longer than the number of devices, the extra characters are ignored.
-    pub fn draw_text(&mut self, text: &str) -> Result<(), Error<SPI::Error>> {
+    pub fn draw_text(&mut self, text: &str) -> Result<()> {
         self.draw_text_with_font(text, &fonts::STANDARD_LED_FONT)
     }
 
     /// Draw a string of text on the LED matrix using a specified font.
     /// Each character is displayed on one device in the daisy chain.
     /// If the string is longer than the number of devices, the extra characters are ignored.
-    pub fn draw_text_with_font(
-        &mut self,
-        text: &str,
-        font: &LedFont,
-    ) -> Result<(), Error<SPI::Error>> {
+    pub fn draw_text_with_font(&mut self, text: &str, font: &LedFont) -> Result<()> {
         let device_count = self.driver.device_count();
 
         let mut row_data = [[0u8; MAX_DISPLAYS]; 8];
@@ -231,7 +223,7 @@ where
         delay: &mut D,
         text: &str,
         config: ScrollConfig,
-    ) -> Result<(), Error<SPI::Error>> {
+    ) -> Result<()> {
         let mut scroller = ScrollingText::new(text, &fonts::STANDARD_LED_FONT, config);
         scroller.reset();
 
@@ -265,11 +257,7 @@ where
     }
 
     /// Scroll the given text across the LED matrix using the default scroll configuration.
-    pub fn scroll_text_default<D: DelayNs>(
-        &mut self,
-        delay: &mut D,
-        text: &str,
-    ) -> Result<(), Error<SPI::Error>> {
+    pub fn scroll_text_default<D: DelayNs>(&mut self, delay: &mut D, text: &str) -> Result<()> {
         self.scroll_text(delay, text, ScrollConfig::default())
     }
 
@@ -291,7 +279,7 @@ where
     ///     ops\[1\] = (Digit0, 0xAA)  // Device 0
     ///
     /// These are sent out in one SPI write for Digit0, and similarly repeated for Digit1 through Digit7.
-    pub fn flush(&mut self) -> Result<(), Error<SPI::Error>> {
+    pub fn flush(&mut self) -> Result<()> {
         for (row, digit_register) in Register::digits().enumerate() {
             let mut ops = [(Register::NoOp, 0); MAX_DISPLAYS];
 
@@ -322,7 +310,7 @@ where
     }
 
     /// Clear screen by resetting buffer and flushing
-    pub fn clear_screen(&mut self) -> Result<(), Error<SPI::Error>> {
+    pub fn clear_screen(&mut self) -> Result<()> {
         self.clear_buffer();
         self.flush()
     }
@@ -349,9 +337,9 @@ where
     SPI: SpiDevice,
 {
     type Color = BinaryColor;
-    type Error = core::convert::Infallible; // Or your specific error type
+    type Error = core::convert::Infallible;
 
-    fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
+    fn draw_iter<I>(&mut self, pixels: I) -> core::result::Result<(), Self::Error>
     where
         I: IntoIterator<Item = Pixel<Self::Color>>,
     {

@@ -152,3 +152,55 @@ impl Symbol {
         }
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_symbol_to_buffer() {
+        // Test that symbols can be converted to buffers without panic
+        let symbols = [
+            Symbol::Heart,
+            Symbol::Smiley,
+            Symbol::SadFace,
+            Symbol::ArrowUp,
+            Symbol::ArrowDown,
+            Symbol::ArrowLeft,
+            Symbol::ArrowRight,
+            Symbol::Checkmark,
+            Symbol::XMark,
+            Symbol::MusicNote,
+            Symbol::Circle,
+        ];
+
+        for symbol in &symbols {
+            let buffer = symbol.to_buffer();
+            
+            // Verify we can read all rows
+            for row in 0..8 {
+                assert!(buffer.get_row(row).is_ok());
+            }
+        }
+    }
+
+    #[test]
+    fn test_heart_symbol() {
+        let buffer = Symbol::Heart.to_buffer();
+        let expected_data = [
+            0b00000000,
+            0b01100110,
+            0b11111111,
+            0b11111111,
+            0b11111111,
+            0b01111110,
+            0b00111100,
+            0b00011000,
+        ];
+        
+        for (row, &expected) in expected_data.iter().enumerate() {
+            assert_eq!(buffer.get_row(row as u8).unwrap(), expected);
+        }
+    }
+}

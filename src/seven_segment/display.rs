@@ -2,7 +2,7 @@
 
 use embedded_hal::spi::SpiDevice;
 
-use crate::{Error, Max7219, seven_segment::Font};
+use crate::{Error, Max7219, Result, seven_segment::Font};
 
 /// A high-level abstraction for controlling a 7-segment display using the MAX7219 driver.
 pub struct SevenSegment<SPI> {
@@ -53,7 +53,7 @@ where
     /// let spi = /* your SPI device */;
     /// let mut display = SevenSegment::from_spi(spi, 4).unwrap();
     /// ```
-    pub fn from_spi(spi: SPI, display_count: usize) -> Result<Self, Error<SPI::Error>> {
+    pub fn from_spi(spi: SPI, display_count: usize) -> Result<Self> {
         let mut driver = Max7219::new(spi).with_device_count(display_count)?;
         driver.init()?;
         Ok(Self { driver })
@@ -112,12 +112,7 @@ where
     /// * `digit` - The digit position (0 to 7) on the device.
     /// * `ch` - The character to write.
     /// * `font` - The font used to convert the character into a segment pattern
-    pub fn write_char(
-        &mut self,
-        digit: u8,
-        ch: char,
-        font: &Font,
-    ) -> Result<(), Error<SPI::Error>> {
+    pub fn write_char(&mut self, digit: u8, ch: char, font: &Font) -> Result<()> {
         self.write_char_to_device(0, digit, ch, font)
     }
 
@@ -138,7 +133,7 @@ where
         digit: u8,
         ch: char,
         font: &Font,
-    ) -> Result<(), Error<SPI::Error>> {
+    ) -> Result<()> {
         let data = font.get_char(ch);
 
         self.driver.write_raw_digit(device_index, digit, data)?;
@@ -155,7 +150,7 @@ where
     /// The BCD decode mode must be enabled beforehand using `set_decode_mode()`.
     ///
     /// Returns an error if the character is not supported in BCD mode.
-    pub fn write_bcd_char(&mut self, digit: u8, ch: char) -> Result<(), Error<SPI::Error>> {
+    pub fn write_bcd_char(&mut self, digit: u8, ch: char) -> Result<()> {
         let data = match ch {
             '0'..='9' => ch as u8 - b'0',
             '-' => 0x0A,
