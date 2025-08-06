@@ -1,6 +1,6 @@
 [package]
 name = "max7219-display"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2024"
 authors = ["ImplFerris"]
 description = "A no_std driver for the MAX7219 LED display controller"
@@ -23,6 +23,7 @@ graphics = ["dep:embedded-graphics-core"]
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
+targets = ["thumbv7m-none-eabi", "thumbv7em-none-eabihf"]
 
 [dev-dependencies]
 embedded-hal-mock = { version = "0.11.1", "features" = ["eh1"] }
