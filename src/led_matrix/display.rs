@@ -277,11 +277,6 @@ where
         Ok(())
     }
 
-    /// Scroll the given text across the LED matrix using the default scroll configuration.
-    pub fn scroll_text_default<D: DelayNs>(&mut self, delay: &mut D, text: &str) -> Result<()> {
-        self.scroll_text(delay, text, ScrollConfig::default())
-    }
-
     /// Flush the internal display buffer to the actual LED matrix hardware.
     ///
     /// This function goes row by row (0 to 7), and for each row, it builds an array of
@@ -845,6 +840,89 @@ mod tests {
         let driver = matrix.driver();
 
         driver.power_on().expect("Power on should succeed");
+        spi.done();
+    }
+}
+
+#[cfg(all(test, feature = "graphics"))]
+mod graphis_tests {
+    use super::*;
+    use embedded_graphics_core::geometry::Point;
+
+    use embedded_hal_mock::eh1::spi::Mock as SpiMock;
+
+    #[test]
+    fn test_draw_target_draw_iter() {
+        let mut spi = SpiMock::new(&[]);
+        let driver = Max7219::new(&mut spi);
+        let mut matrix = SingleMatrix::from_driver(driver).unwrap(); // 1 device, 64 pixels
+
+        // Define some pixels to draw
+        let pixels = [
+            Pixel(Point::new(0, 0), BinaryColor::On), // Device 0, Row 0, Col 0
+            Pixel(Point::new(1, 0), BinaryColor::Off), // Device 0, Row 0, Col 1
+            Pixel(Point::new(7, 7), BinaryColor::On), // Device 0, Row 7, Col 7
+            // out of bounds
+            Pixel(Point::new(8, 0), BinaryColor::On),
+            Pixel(Point::new(0, 8), BinaryColor::On),
+            Pixel(Point::new(20, 20), BinaryColor::On),
+        ];
+
+        // Draw the pixels
+        matrix.draw_iter(pixels.iter().cloned()).unwrap();
+
+        let mut expected = [0u8; 64];
+        expected[0] = 1; // (0, 0) ON
+        expected[1] = 0; // (1, 0) OFF
+        expected[63] = 1; // (7, 7) ON
+
+        assert_eq!(&matrix.framebuffer, &expected);
+
+        spi.done();
+    }
+
+    #[test]
+    fn test_draw_target_draw_iter_multi_device() {
+        let mut spi = SpiMock::new(&[]);
+        let driver = Max7219::new(&mut spi).with_device_count(2).unwrap(); // 2 devices
+        let mut matrix: LedMatrix<_, 128, 2> = LedMatrix::from_driver(driver).unwrap(); // 2 devices, 128 pixels
+
+        // Define some pixels to draw across devices
+        let pixels = [
+            // x=0 → device = 0/8 = 0
+            // col = 0%8 = 0
+            // row = 0
+            // index = device*64 + row*8 + col = 0*64 + 0*8 + 0 = 0
+            Pixel(Point::new(0, 0), BinaryColor::On),
+            // x=7 → device = 7/8 = 0
+            // col = 7%8 = 7
+            // row = 0
+            // index = 0*64 + 0*8 + 7 = 7
+            Pixel(Point::new(7, 0), BinaryColor::On),
+            // x=8 → device = 8/8 = 1
+            // col = 8%8 = 0
+            // row = 1
+            // index = device*64 + row*8 + col = 1*64 + 1*8 + 0 = 64 + 8 + 0 = 72
+            Pixel(Point::new(8, 1), BinaryColor::On),
+            // x=15 → device = 15/8 = 1
+            // col = 15%8 = 7
+            // row = 7
+            // index = 1*64 + 7*8 + 7 = 64 + 56 + 7 = 127
+            Pixel(Point::new(15, 7), BinaryColor::On),
+        ];
+
+        // Draw the pixels
+        matrix.draw_iter(pixels.iter().cloned()).unwrap();
+
+        // Check framebuffer state
+        let mut expected = [0u8; 128];
+        expected[0] = 1; // Device 0, Col 0, Row 0
+        expected[7] = 1; // Device 0, Col 7, Row 0
+        expected[72] = 1; // Device 1, Col 0, Row 1
+        expected[127] = 1; // Device 1, Col 7, Row 7
+
+        assert_eq!(&matrix.framebuffer, &expected);
+
         spi.done();
     }
 }
