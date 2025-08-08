@@ -93,7 +93,7 @@ where
     ///
     /// # Arguments
     ///
-    /// * `device_index` - Index of the device in the chain (0 = furthest from MCU, N-1 = nearest to MCU).
+    /// * `device_index` - Index of the device in the chain (0 = closest from MCU, N-1 = furthest to MCU).
     /// * `register` - The register to write to (e.g., `Register::Shutdown`, `Register::Digit0`, etc.).
     /// * `data` - The value to write to the register.
     ///
@@ -345,7 +345,7 @@ where
     ///
     /// # Arguments
     ///
-    /// - `device_index`: Index of the display in the daisy chain (0 = furthest from MCU)
+    /// - `device_index`: Index of the display in the daisy chain (0 = closest to the Microcontroller)
     /// - `digit`: Which digit register to write to (`Digit::D0` to `Digit::D7`)
     /// - `value`: The raw 8-bit data to send to the digit register
     pub fn write_raw_digit(&mut self, device_index: usize, digit: u8, value: u8) -> Result<()> {
@@ -357,7 +357,7 @@ where
     ///
     /// # Arguments
     ///
-    /// - `device_index`: Index of the display in the daisy chain (0 = furthest from MCU)
+    /// - `device_index`: Index of the display in the daisy chain (0 = closest to the Microcontroller)
     /// - `intensity`: Brightness level from `0` to `15` (`0x00` to `0x0F`)
     pub fn set_intensity(&mut self, device_index: usize, intensity: u8) -> Result<()> {
         if intensity > 0x0F {
