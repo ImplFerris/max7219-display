@@ -784,6 +784,30 @@ mod tests {
     }
 
     #[test]
+    fn test_write_device_register_valid_index() {
+        let expected_transactions = [
+            Transaction::transaction_start(),
+            Transaction::write_vec(vec![
+                Register::Shutdown.addr(),
+                0x01,
+                0x00, // no-op for second device in chain
+                0x00,
+            ]),
+            Transaction::transaction_end(),
+        ];
+        let mut spi = SpiMock::new(&expected_transactions);
+        let mut driver = Max7219::new(&mut spi)
+            .with_device_count(2)
+            .expect("Should accept valid count");
+
+        driver
+            .write_device_register(0, Register::Shutdown, 0x01)
+            .expect("should write register");
+
+        spi.done();
+    }
+
+    #[test]
     fn test_write_device_register_invalid_index() {
         let mut spi = SpiMock::new(&[]); // No SPI transactions expected
         let mut driver = Max7219::new(&mut spi)
