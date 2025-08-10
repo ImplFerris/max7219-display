@@ -193,8 +193,7 @@ where
 
         let mut row_data = [[0u8; MAX_DISPLAYS]; 8];
 
-        for (i, ch) in text.chars().take(device_count).enumerate() {
-            let device_index = device_count - 1 - i;
+        for (device_index, ch) in text.chars().take(device_count).enumerate() {
             let bitmap = font.get_char(ch);
             for (row, &value) in bitmap.iter().enumerate() {
                 row_data[row][device_index] = value;
@@ -297,7 +296,7 @@ where
     /// These are sent out in one SPI write for Digit0, and similarly repeated for Digit1 through Digit7.
     pub fn flush(&mut self) -> Result<()> {
         for (row, digit_register) in Register::digits().enumerate() {
-            let mut ops = [(Register::NoOp, 0); MAX_DISPLAYS];
+            let mut ops = [(Register::NoOp, 0); DEVICE_COUNT];
 
             for device_index in 0..DEVICE_COUNT {
                 let buffer_start = device_index * 64 + row * 8;

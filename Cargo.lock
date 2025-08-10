@@ -81,7 +81,7 @@ dependencies = [
 
 [[package]]
 name = "max7219-display"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "embedded-graphics-core",
  "embedded-hal 1.0.0",

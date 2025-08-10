@@ -93,7 +93,7 @@ where
     ///
     /// # Arguments
     ///
-    /// * `device_index` - Index of the device in the chain (0 = closest from MCU, N-1 = furthest to MCU).
+    /// * `device_index` - Index of the device in the chain (0 = furthest from MCU, N-1 = closest to MCU).
     /// * `register` - The register to write to (e.g., `Register::Shutdown`, `Register::Digit0`, etc.).
     /// * `data` - The value to write to the register.
     ///
@@ -124,11 +124,9 @@ where
 
     /// Write each (register, data) tuple to its corresponding MAX7219 device in the daisy chain.
     ///
-    /// The number of tuples in `ops` must exactly match `self.device_count`. Each entry
-    /// in `ops` is sent to the device at the same index: `ops[0]` to device 0, `ops[1]` to device 1, etc.
-    ///
-    /// The SPI buffer is filled in reverse order so that the first bytes clocked out
-    /// travel through the chain and reach the last device first.
+    /// The number of tuples in `ops` must exactly match `self.device_count`.
+    /// Convention: ops[0] = furthest device from MCU, ops[device_count-1] = nearest device
+    /// Because The first one we send in the SPI gets pushed till the last device.
     ///
     /// # Panics (only in debug builds)
     /// - If `ops.len() != self.device_count`.
@@ -139,8 +137,7 @@ where
         // clear the buffer: 2 bytes per device
         self.buffer = [0; MAX_DISPLAYS * 2];
 
-        // fill in reverse order so that SPI shifts into the last device first
-        for (i, &(reg, data)) in ops.iter().rev().enumerate() {
+        for (i, &(reg, data)) in ops.iter().enumerate() {
             let offset = i * 2;
             self.buffer[offset] = reg as u8;
             self.buffer[offset + 1] = data;
@@ -345,7 +342,7 @@ where
     ///
     /// # Arguments
     ///
-    /// - `device_index`: Index of the display in the daisy chain (0 = closest to the Microcontroller)
+    /// - `device_index`: Index of the display in the daisy chain (0 = Furthest from the Microcontroller)
     /// - `digit`: Which digit register to write to (`Digit::D0` to `Digit::D7`)
     /// - `value`: The raw 8-bit data to send to the digit register
     pub fn write_raw_digit(&mut self, device_index: usize, digit: u8, value: u8) -> Result<()> {
@@ -357,7 +354,7 @@ where
     ///
     /// # Arguments
     ///
-    /// - `device_index`: Index of the display in the daisy chain (0 = closest to the Microcontroller)
+    /// - `device_index`: Index of the display in the daisy chain (0 = Furthest from the Microcontroller)
     /// - `intensity`: Brightness level from `0` to `15` (`0x00` to `0x0F`)
     pub fn set_intensity(&mut self, device_index: usize, intensity: u8) -> Result<()> {
         if intensity > 0x0F {
